@@ -29,11 +29,11 @@ def init_poles(w, n_poles):
     elif n_poles == 3:
         poles = w[-1]*np.array([loss_ratio, -loss_ratio-1j, -loss_ratio+1j])
     elif n_poles > 3 and n_poles%2 == 0:
-        complex_poles = np.linspace(0, 1, (n_poles-2)/2+1)[1:]
+        complex_poles = np.linspace(0, 1, int((n_poles-2)/2+1))[1:]
         poles = np.concatenate( [[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_poles] )
         poles = w[-1]*np.concatenate( [[-1, -10], poles] )
     elif n_poles > 3 and n_poles%2 == 1:
-        complex_poles = np.linspace(-1, 1, (n_poles-3)/2+1)[1:]
+        complex_poles = np.linspace(-1, 1, int((n_poles-3)/2+1))[1:]
         poles = np.concatenate( [[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_poles] )
         poles = w[-1]*np.concatenate( [[-1, -3, -10], poles] )
     else:
@@ -56,7 +56,7 @@ def pair_poles(poles):
     
     return poles_pair
 
-def vector_fitting_step(f, s, poles):
+def vector_fitting_step(f, s, poles, has_d=1, has_h=1):
     # Function generates a new set of poles
     
     # First group input poles into complex conjugate pairs
@@ -65,7 +65,7 @@ def vector_fitting_step(f, s, poles):
     poles_pair = pair_poles(poles)
     
     # Then generate the A and b from Appendix A
-    A = np.zeros((nF, 2*nP+2), dtype=np.complex64)
+    A = np.zeros((nF, 2*nP+has_d+has_h), dtype=np.complex64)
     for i, p in enumerate(poles):
         if poles_pair[i] == 0:
             A[:, i] = 1/(s-p)
@@ -76,8 +76,10 @@ def vector_fitting_step(f, s, poles):
         else:
             raise RuntimeError("poles_pair[%d] = %d" % (i, poles_pair[i]))
         A[:, -nP+i] = -A[:, i] * f
-    A[:, nP] = 1
-    A[:, nP+1] = s
+    if has_d:
+        A[:, nP] = 1
+    if has_h:
+        A[:, nP+has_d] = s
     
     b = f
     
@@ -113,7 +115,7 @@ def vector_fitting_step(f, s, poles):
     # Return new poles
     return new_poles
 
-def calculate_residues(f, s, poles):
+def calculate_residues(f, s, poles, has_d=1, has_h=1):
     # Function uses the input poles to calculate residues
     
     # First group input poles into complex conjugate pairs
@@ -122,7 +124,7 @@ def calculate_residues(f, s, poles):
     poles_pair = pair_poles(poles)
     
     # Then generate the A and b from Appendix A, without the negative part
-    A = np.zeros((nF, nP+2), dtype=np.complex64)
+    A = np.zeros((nF, nP+has_d+has_h), dtype=np.complex64)
     for i, p in enumerate(poles):
         if poles_pair[i] == 0:
             A[:, i] = 1/(s-p)
@@ -132,8 +134,10 @@ def calculate_residues(f, s, poles):
             A[:, i] = 1j/(s-p) - 1j/(s-p.conjugate())
         else:
             raise RuntimeError("poles_pair[%d] = %d" % (i, poles_pair[i]))
-    A[:, nP] = 1
-    A[:, nP+1] = s
+    if has_d:
+        A[:, nP] = 1
+    if has_h:
+        A[:, nP+has_d] = s
     
     b = f
     
@@ -152,8 +156,12 @@ def calculate_residues(f, s, poles):
            r1, r2 = residues[i:i+2]
            residues[i] = r1 - 1j*r2
            residues[i+1] = r1 + 1j*r2
-    d = x[nP]
-    h = x[nP+1]
+    d = 0
+    h = 0
+    if has_d:
+        d = x[nP]
+    if has_h:
+        h = x[nP+has_d]
     
     return residues, d, h
 
@@ -184,7 +192,7 @@ def calculate_zeros(poles, residues, d):
     return z
 
 
-def vector_fitting(f, s, n_poles=10, n_iters=10):
+def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1):
     # Function runs vector fitting
     # Assume w is imaginary, non-negative and in a ascending order
     w = np.imag(s)
@@ -192,10 +200,10 @@ def vector_fitting(f, s, n_poles=10, n_iters=10):
     #print(poles)
     
     for loop in range(n_iters):
-        poles = vector_fitting_step(f, s, poles)
+        poles = vector_fitting_step(f, s, poles, has_d=has_d, has_h=has_h)
         #print(poles)
     
-    residues, d, h = calculate_residues(f, s, poles)
+    residues, d, h = calculate_residues(f, s, poles, has_d=has_d, has_h=has_h)
     
     return poles, residues, d, h
 
@@ -241,11 +249,12 @@ if __name__ == '__main__':
     f_test = model(s_test, poles_test, residues_test, d_test, h_test)
     
     #poles, residues, d, h = vector_fitting(fTest, sTest, nIters=2)
-    poles, residues, d, h = vector_fitting_rescale(f_test, s_test, n_poles=18, n_iters=10)
+    poles, residues, d, h = vector_fitting_rescale(f_test, s_test, n_poles=16, n_iters=10, has_d=1, has_h=1)
     f_fit = model(s_test, poles, residues, d, h)
     
     plt.plot(np.abs(s_test), 20*np.log10(np.abs(f_test)), 'b-')
     plt.plot(np.abs(s_test), 20*np.log10(np.abs(f_fit)), 'r--')
+    plt.plot(np.abs(s_test), 20*np.log10(np.abs(f_fit-f_test)), 'k--')
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude (dB)')
     plt.show()
