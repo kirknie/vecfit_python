@@ -39,7 +39,7 @@ if __name__ == '__main__':
     s_data = (z_data-50) / (z_data+50)
     z0 = 50
     
-    poles, residues, d, h = vector_fitting.vector_fitting_rescale(z_data, cs, n_poles=18, n_iters=20, has_d=1, has_h=1)
+    poles, residues, d, h = vector_fitting.vector_fitting_rescale(z_data, cs, n_poles=20, n_iters=20, has_d=1, has_h=0, fixed_poles=[0])
     f_fit = vector_fitting.model(cs, poles, residues, d, h)
     
     print(poles)
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     s_zeros = vector_fitting.calculate_zeros(poles, residues, d-z0)
     s_poles = vector_fitting.calculate_zeros(poles, residues, d+z0)
     
-    bound = -np.pi/2*(sum(s_poles)+sum(s_zeros))
+    bound = -np.pi/2*(sum(1/s_poles)+sum(1/s_zeros))
     print('Bound is {:.5e}'.format(bound.real))
     
     plt.figure()
