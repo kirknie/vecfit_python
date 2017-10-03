@@ -56,17 +56,19 @@ def pair_poles(poles):
     
     return poles_pair
 
-def vector_fitting_step(f, s, poles, has_d=1, has_h=1):
+def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[]):
     # Function generates a new set of poles
     
     # First group input poles into complex conjugate pairs
-    nP = len(poles)
+    poles_all = np.concatenate([poles, fixed_poles])
+    nP = len(poles_all)
+    nP_iter = len(poles)
     nF = len(s)
-    poles_pair = pair_poles(poles)
+    poles_pair = pair_poles(poles_all)
     
     # Then generate the A and b from Appendix A
-    A = np.zeros((nF, 2*nP+has_d+has_h), dtype=np.complex64)
-    for i, p in enumerate(poles):
+    A = np.zeros((nF, nP+has_d+has_h+nP_iter), dtype=np.complex64)
+    for i, p in enumerate(poles_all):
         if poles_pair[i] == 0:
             A[:, i] = 1/(s-p)
         elif poles_pair[i] == 1:
@@ -75,7 +77,8 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1):
             A[:, i] = 1j/(s-p) - 1j/(s-p.conjugate())
         else:
             raise RuntimeError("poles_pair[%d] = %d" % (i, poles_pair[i]))
-        A[:, -nP+i] = -A[:, i] * f
+        if i < nP_iter:
+            A[:, -nP_iter+i] = -A[:, i] * f
     if has_d:
         A[:, nP] = 1
     if has_h:
@@ -94,7 +97,7 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1):
     
     # Calculate the new poles by following Appendix B
     A = np.diag(poles)
-    b = np.ones(nP)
+    b = np.ones(nP_iter)
     for i, p in enumerate(poles):
         if poles_pair[i] == 1:
             A[i, i] = A[i+1, i+1] = p.real
@@ -102,7 +105,7 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1):
             A[i+1, i] = p.imag
             b[i] = 2
             b[i+1] = 0
-    c = x[-nP:]
+    c = x[-nP_iter:]
     
     H = A - np.outer(b, c)
     #print('H is:', H)
@@ -192,7 +195,7 @@ def calculate_zeros(poles, residues, d):
     return z
 
 
-def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1):
+def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[]):
     # Function runs vector fitting
     # Assume w is imaginary, non-negative and in a ascending order
     w = np.imag(s)
@@ -200,9 +203,10 @@ def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1):
     #print(poles)
     
     for loop in range(n_iters):
-        poles = vector_fitting_step(f, s, poles, has_d=has_d, has_h=has_h)
+        poles = vector_fitting_step(f, s, poles, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles)
         #print(poles)
     
+    poles = np.concatenate([poles, fixed_poles])
     residues, d, h = calculate_residues(f, s, poles, has_d=has_d, has_h=has_h)
     
     return poles, residues, d, h
