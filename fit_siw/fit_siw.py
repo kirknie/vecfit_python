@@ -8,8 +8,8 @@ Created on Mon Sep 25 20:57:57 2017
 import numpy as np
 import matplotlib.pyplot as plt
 import skrf as rf
-#import sys
-#sys.path.append('../')
+import sys
+sys.path.append('../')
 import vector_fitting
 
 ## import from a specific directory
