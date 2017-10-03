@@ -37,32 +37,38 @@ if __name__ == '__main__':
     z0_data = np.array(get_z0(s1p_file)[500:])
     z_data = z0_data * (1+s_data) / (1-s_data)
     s_data = (z_data-50) / (z_data+50)
+    z0 = 50
     
-    poles, residues, d, h = vector_fitting.vector_fitting_rescale(s_data, cs, n_poles=18, n_iters=20, has_h=0)
+    poles, residues, d, h = vector_fitting.vector_fitting_rescale(z_data, cs, n_poles=18, n_iters=20, has_d=1, has_h=1)
     f_fit = vector_fitting.model(cs, poles, residues, d, h)
     
     print(poles)
     
     plt.figure()
-    plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(s_data)), 'b-')
+    plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(z_data)), 'b-')
     plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(f_fit)), 'r--')
-    plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(f_fit-s_data)), 'k--')
+    plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(f_fit-z_data)), 'k--')
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude (dB)')
     
     # plot the fitted data in a broader bandwidth
-    s_all = np.logspace(10, 12, 1e4)*1j
+    s_all = np.logspace(10, 12, 1e5)*1j
     f_fit_all = vector_fitting.model(s_all, poles, residues, d, h)
-    z = vector_fitting.calculate_zeros(poles, residues, d)
-    print('Zeros are:', z)
     
-    check_zeros = vector_fitting.model(z, poles, residues, d, h)
+    #z = vector_fitting.calculate_zeros(poles, residues, d)
+    #print('Zeros are:', z)
+    #check_zeros = vector_fitting.model(z, poles, residues, d, h)
     
-    bound = sum(poles)+sum(z)
-    print('Bound is', bound)
+    # For S, zeros are z = z0, poles are z = -z0
+    s_zeros = vector_fitting.calculate_zeros(poles, residues, d-z0)
+    s_poles = vector_fitting.calculate_zeros(poles, residues, d+z0)
+    
+    bound = -np.pi/2*(sum(s_poles)+sum(s_zeros))
+    print('Bound is {:.5e}'.format(bound.real))
     
     plt.figure()
     plt.semilogx(np.abs(s_all), 20*np.log10(np.abs(f_fit_all)), 'b-')
+    plt.semilogx(np.abs(s_all), 20*np.log10(np.abs(f_fit_all.real)), 'r--')
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude (dB)')
     
