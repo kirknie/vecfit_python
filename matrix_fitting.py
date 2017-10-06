@@ -144,7 +144,7 @@ def matrix_fitting(f, s, n_poles=10, n_iters=10):
     # Assume w is imaginary, non-negative and in a ascending order
     w = np.imag(s)
     f_vec = mat2vec(f)
-    poles = vector_fitting.init_poles(w, n_poles)
+    poles = vector_fitting.init_poles(w[-1], n_poles)
     #print(poles)
     
     for loop in range(n_iters):

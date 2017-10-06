@@ -23,22 +23,22 @@ def init_poles(w, n_poles):
     n_poles = int(n_poles)
     
     if n_poles == 1:
-        poles = np.array(-loss_ratio*w[-1])
+        poles = np.array(-loss_ratio*w)
     elif n_poles == 2:
-        poles = w[-1]*np.array([-loss_ratio-1j, -loss_ratio+1j])
+        poles = w * np.array([-loss_ratio-1j, -loss_ratio+1j])
     elif n_poles == 3:
-        poles = w[-1]*np.array([loss_ratio, -loss_ratio-1j, -loss_ratio+1j])
+        poles = w * np.array([loss_ratio, -loss_ratio-1j, -loss_ratio+1j])
     elif n_poles > 3 and n_poles%2 == 0:
         complex_poles = np.linspace(0, 1, int((n_poles-2)/2+1))[1:]
         poles = np.concatenate( [[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_poles] )
-        poles = w[-1]*np.concatenate( [[-1, -10], poles] )
+        poles = w * np.concatenate( [[-1, -10], poles] )
     elif n_poles > 3 and n_poles%2 == 1:
-        complex_poles = np.linspace(-1, 1, int((n_poles-3)/2+1))[1:]
+        complex_poles = np.linspace(0, 1, int((n_poles-3)/2+1))[1:]
         poles = np.concatenate( [[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_poles] )
-        poles = w[-1]*np.concatenate( [[-1, -3, -10], poles] )
+        poles = w * np.concatenate( [[-1, -3, -10], poles] )
     else:
         raise RuntimeError('Error: invalid number of poles')
-    print('Number of poles', len(poles))
+    #print('Number of poles', len(poles))
     return poles
 
 def pair_poles(poles):
@@ -58,6 +58,7 @@ def pair_poles(poles):
 
 def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[]):
     # Function generates a new set of poles
+    # Should create a class and let z_fitting inherit the class
     
     # First group input poles into complex conjugate pairs
     poles_all = np.concatenate([poles, fixed_poles])
@@ -199,7 +200,7 @@ def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[
     # Function runs vector fitting
     # Assume w is imaginary, non-negative and in a ascending order
     w = np.imag(s)
-    poles = init_poles(w, n_poles)
+    poles = init_poles(w[-1], n_poles)
     #print(poles)
     
     for loop in range(n_iters):
