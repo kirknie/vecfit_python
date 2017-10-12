@@ -12,6 +12,7 @@ import sys
 sys.path.append('../')
 import vector_fitting
 import fit_z
+import fit_s
 
 ## import from a specific directory
 #import importlib.util
@@ -80,6 +81,24 @@ if __name__ == '__main__':
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude (dB)')
     
+    
+    # Try to fit S
+    poles, residues, d, h = fit_s.fit_s(s_data, cs, n_poles=19, n_iters=20, s_dc=0, s_inf=1)
+    fs_fit = vector_fitting.model(cs, poles, residues, d, h)
+    s_zeros = vector_fitting.calculate_zeros(poles, residues, d)
+    fs_fit_all = vector_fitting.model(s_all, poles, residues, d, h)
+    
+    plt.figure()
+    plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(s_data)), 'b-')
+    plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(fs_fit)), 'r--')
+    plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(fs_fit-s_data)), 'k--')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude (dB)')
+    
+    plt.figure()
+    plt.plot(np.abs(s_all)/2/np.pi, 20*np.log10(np.abs(fs_fit_all)), 'b-')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude (dB)')
     
     plt.show()
     
