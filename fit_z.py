@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import vector_fitting
 
 
-def fit_z_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z=[]):
+def fit_z_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0):
     # Function generates a new set of poles
     # Should create a class and let z_fitting inherit the class
     
@@ -56,6 +56,20 @@ def fit_z_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z=[]):
     # Solve for x in (A.8) using least mean square
     A = np.vstack([np.real(A), np.imag(A)])
     b = np.concatenate([np.real(b), np.imag(b)])
+    
+    if pole_wt > 0:  # Put some weight on the sum of poles
+        A = np.vstack([A, np.zeros((1, nP+has_d+has_h+nP_iter), dtype=np.complex64)])
+        b = np.concatenate([b, [np.real(np.sum(poles))*pole_wt]])
+        for i, p in enumerate(poles):
+            if poles_pair[i] == 0:
+                A[-1, -nP_iter+i] = 1*pole_wt
+            elif poles_pair[i] == 1:
+                A[-1, -nP_iter+i] = 2*pole_wt
+            elif poles_pair[i] == 2:
+                A[-1, -nP_iter+i] = 0*pole_wt
+    
+    
+    
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
     
     #residues = x[:nP]
@@ -150,7 +164,7 @@ def calculate_residues_z(f, s, poles, has_d=1, has_h=1, reflect_z=[]):
     return residues, d, h
 
 
-def fit_z(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[], reflect_z=[]):
+def fit_z(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0):
     # Function runs vector fitting
     # Assume w is imaginary, non-negative and in a ascending order
     # reflect_z needs to be in conjugate pairs and in the RHP, only support 1 reflection point now
@@ -164,7 +178,7 @@ def fit_z(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[], reflec
         #print('Poles:', p)
     
     for loop in range(n_iters):
-        poles = fit_z_step(f, s, poles, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles, reflect_z=reflect_z)
+        poles = fit_z_step(f, s, poles, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles, reflect_z=reflect_z, pole_wt=pole_wt)
         #print(poles)
     
     poles = np.concatenate([poles, fixed_poles])

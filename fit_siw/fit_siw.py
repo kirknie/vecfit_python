@@ -83,10 +83,12 @@ if __name__ == '__main__':
     
     
     # Try to fit S
-    poles, residues, d, h = fit_s.fit_s(s_data, cs, n_poles=19, n_iters=20, s_dc=0, s_inf=1)
+    poles, residues, d, h = fit_s.fit_s(s_data, cs, n_poles=19, n_iters=20, s_dc=0, s_inf=1, pole_wt=1e-12)
     fs_fit = vector_fitting.model(cs, poles, residues, d, h)
     s_zeros = vector_fitting.calculate_zeros(poles, residues, d)
     fs_fit_all = vector_fitting.model(s_all, poles, residues, d, h)
+    bound = -np.pi/2*(sum(poles)+sum(s_zeros))
+    print('Bound is {:.5e}'.format(bound.real))
     
     plt.figure()
     plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(s_data)), 'b-')
