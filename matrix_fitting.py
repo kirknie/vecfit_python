@@ -23,7 +23,7 @@ def matrix_model(s, poles, residues, d, h):
     return f
 
 
-def matrix_fitting_step(f, s, poles):
+def matrix_fitting_step(f, s, poles, has_d=1, has_h=1):
     # Function generates a new set of poles
     
     # First group input poles into complex conjugate pairs
@@ -33,8 +33,8 @@ def matrix_fitting_step(f, s, poles):
     poles_pair = vector_fitting.pair_poles(poles)
     
     # Then generate the A and b from Appendix A
-    A = np.zeros((nF*nD, (nP+2)*nD+nP), dtype=np.complex128)
-    A1 = np.zeros((nF, nP+2), dtype=np.complex128) # for residues and d, h
+    A = np.zeros((nF*nD, (nP+has_d+has_h)*nD+nP), dtype=np.complex128)
+    A1 = np.zeros((nF, nP+has_d+has_h), dtype=np.complex128) # for residues and d, h
     for i, p in enumerate(poles):
         if poles_pair[i] == 0:
             A1[:, i] = 1/(s-p)
@@ -44,11 +44,13 @@ def matrix_fitting_step(f, s, poles):
             A1[:, i] = 1j/(s-p) - 1j/(s-p.conjugate())
         else:
             raise RuntimeError("poles_pair[%d] = %d" % (i, poles_pair[i]))
-    A1[:, nP] = 1
-    A1[:, nP+1] = s
+    if has_d:
+        A1[:, nP] = 1
+    if has_h:
+        A1[:, nP+has_d] = s
 
     for i in range(nD):
-        A[nF*i:nF*(i+1), (nP+2)*i:(nP+2)*(i+1)] = A1[:, :]
+        A[nF*i:nF*(i+1), (nP+has_d+has_h)*i:(nP+has_d+has_h)*(i+1)] = A1[:, :]
         for j in range(nP):
             A[nF*i:nF*(i+1), -nP+j] = -A1[:, j] * f[i, :]
     
@@ -87,7 +89,7 @@ def matrix_fitting_step(f, s, poles):
     return new_poles
 
 
-def calculate_matrix_residues(f, s, poles):
+def calculate_matrix_residues(f, s, poles, has_d=1, has_h=1):
     # Function calls calculate_residues nD times
     nP = len(poles)
     nF = len(s)
@@ -97,7 +99,7 @@ def calculate_matrix_residues(f, s, poles):
     h = np.zeros([nD, 1], dtype=np.complex128)
 
     for i in range(nD):
-        residues[i, :], d[i, :], h[i, :] = vector_fitting.calculate_residues(f[i, :].reshape(nF), s, poles)
+        residues[i, :], d[i, :], h[i, :] = vector_fitting.calculate_residues(f[i, :].reshape(nF), s, poles, has_d=has_d, has_h=has_h)
     
     return residues, d, h
 
@@ -139,19 +141,17 @@ def vec2mat(f_vec):
     return f_mat
 
 
-def matrix_fitting(f, s, n_poles=10, n_iters=10):
+def matrix_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1):
     # Function runs vector fitting
     # Assume w is imaginary, non-negative and in a ascending order
     w = np.imag(s)
     f_vec = mat2vec(f)
     poles = vector_fitting.init_poles(w[-1], n_poles)
-    #print(poles)
     
     for loop in range(n_iters):
-        poles = matrix_fitting_step(f_vec, s, poles)
-        #print(poles)
+        poles = matrix_fitting_step(f_vec, s, poles, has_d=has_d, has_h=has_h)
     
-    residues_vec, d_vec, h_vec = calculate_matrix_residues(f_vec, s, poles)
+    residues_vec, d_vec, h_vec = calculate_matrix_residues(f_vec, s, poles, has_d=has_d, has_h=has_h)
     residues = vec2mat(residues_vec)
     d = vec2mat(d_vec)
     h = vec2mat(h_vec)
@@ -211,7 +211,7 @@ if __name__ == '__main__':
     
     f_test = matrix_model(s_test, poles_test, residues_test, d_test, h_test)
     
-    poles, residues, d, h = matrix_fitting(f_test, s_test, n_poles=18)
+    poles, residues, d, h = matrix_fitting(f_test, s_test, n_poles=18, has_d=0, has_h=1)
     #poles, residues, d, h = matrix_fitting_rescale(f_test, s_test, n_poles=10, n_iters=10)
     f_fit = matrix_model(s_test, poles, residues, d, h)
     
