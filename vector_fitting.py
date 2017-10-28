@@ -56,7 +56,7 @@ def pair_poles(poles):
     
     return poles_pair
 
-def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[]):
+def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0):
     # Function generates a new set of poles
     # Should create a class and let z_fitting inherit the class
     
@@ -66,6 +66,10 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[]):
     nP_iter = len(poles)
     nF = len(s)
     poles_pair = pair_poles(poles_all)
+    
+    # Constraint: d = sum(-1/2*( 1/(s0-ai)+1/(-s0-ai) ))
+    if reflect_z:
+        has_d = 0
     
     # Then generate the A and b from Appendix A
     A = np.zeros((nF, nP+has_d+has_h+nP_iter), dtype=np.complex64)
@@ -85,11 +89,34 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[]):
     if has_h:
         A[:, nP+has_d] = s
     
+    if reflect_z:
+        s0 = reflect_z[0]
+        for i, p in enumerate(poles_all):
+            if poles_pair[i] == 0:
+                A[:, i] += -( 1/(s0-p) + 1/(-s0-p) ) / 2
+            elif poles_pair[i] == 1:
+                A[:, i] += -( 1/(s0-p) + 1/(-s0-p) ) / 2 - ( 1/(s0-p.conjugate()) + 1/(-s0-p.conjugate()) ) / 2
+            elif poles_pair[i] == 2:
+                A[:, i] += -1j*( 1/(s0-p) + 1/(-s0-p) ) / 2 + 1j*( 1/(s0-p.conjugate()) + 1/(-s0-p.conjugate()) ) / 2
     b = f
     
     # Solve for x in (A.8) using least mean square
     A = np.vstack([np.real(A), np.imag(A)])
     b = np.concatenate([np.real(b), np.imag(b)])
+    
+    if pole_wt > 0:  # Put some weight on the sum of poles
+        A = np.vstack([A, np.zeros((1, nP+has_d+has_h+nP_iter), dtype=np.complex64)])
+        b = np.concatenate([b, [np.real(np.sum(poles))*pole_wt]])
+        for i, p in enumerate(poles):
+            if poles_pair[i] == 0:
+                A[-1, -nP_iter+i] = 1*pole_wt
+            elif poles_pair[i] == 1:
+                A[-1, -nP_iter+i] = 2*pole_wt
+            elif poles_pair[i] == 2:
+                A[-1, -nP_iter+i] = 0*pole_wt
+    
+    
+    
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
     
     #residues = x[:nP]
@@ -119,13 +146,16 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[]):
     # Return new poles
     return new_poles
 
-def calculate_residues(f, s, poles, has_d=1, has_h=1):
+def calculate_residues(f, s, poles, has_d=1, has_h=1, reflect_z=[]):
     # Function uses the input poles to calculate residues
     
     # First group input poles into complex conjugate pairs
     nP = len(poles)
     nF = len(s)
     poles_pair = pair_poles(poles)
+    
+    if reflect_z:
+        has_d = 0
     
     # Then generate the A and b from Appendix A, without the negative part
     A = np.zeros((nF, nP+has_d+has_h), dtype=np.complex64)
@@ -143,6 +173,15 @@ def calculate_residues(f, s, poles, has_d=1, has_h=1):
     if has_h:
         A[:, nP+has_d] = s
     
+    if reflect_z:
+        s0 = reflect_z[0]
+        for i, p in enumerate(poles):
+            if poles_pair[i] == 0:
+                A[:, i] += -( 1/(s0-p) + 1/(-s0-p) ) / 2
+            elif poles_pair[i] == 1:
+                A[:, i] += -( 1/(s0-p) + 1/(-s0-p) ) / 2 - ( 1/(s0-p.conjugate()) + 1/(-s0-p.conjugate()) ) / 2
+            elif poles_pair[i] == 2:
+                A[:, i] += -1j*( 1/(s0-p) + 1/(-s0-p) ) / 2 + 1j*( 1/(s0-p.conjugate()) + 1/(-s0-p.conjugate()) ) / 2
     b = f
     
     # Solve for x in (A.8) using least mean square
@@ -166,6 +205,9 @@ def calculate_residues(f, s, poles, has_d=1, has_h=1):
         d = x[nP]
     if has_h:
         h = x[nP+has_d]
+    if reflect_z:
+        s0 = reflect_z[0]
+        d = np.sum([-(r/(s0-p)+r/(-s0-p))/2 for p, r in zip(poles, residues)])
     
     return residues, d, h
 
@@ -196,21 +238,24 @@ def calculate_zeros(poles, residues, d):
     return z
 
 
-def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[]):
+def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0):
     # Function runs vector fitting
     # Assume w is imaginary, non-negative and in a ascending order
+    # reflect_z needs to be in conjugate pairs and in the RHP, only support 1 reflection point now
+    if reflect_z and not has_d:
+        raise RuntimeError('Cannot guarantee reflection when d=0')
+    
     w = np.imag(s)
     poles = init_poles(w[-1], n_poles)
-    #print(poles)
     
     for loop in range(n_iters):
-        poles = vector_fitting_step(f, s, poles, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles)
-        #print(poles)
+        poles = vector_fitting_step(f, s, poles, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles, reflect_z=reflect_z, pole_wt=pole_wt)
     
     poles = np.concatenate([poles, fixed_poles])
-    residues, d, h = calculate_residues(f, s, poles, has_d=has_d, has_h=has_h)
+    residues, d, h = calculate_residues(f, s, poles, has_d=has_d, has_h=has_h, reflect_z=reflect_z)
     
     return poles, residues, d, h
+
 
 def vector_fitting_rescale(f, s, **kwargs):
     # Function rescales f and s and run vector fitting
