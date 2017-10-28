@@ -7,7 +7,7 @@ Created on Mon Sep 25 20:57:57 2017
 
 import numpy as np
 import matplotlib.pyplot as plt
-import skrf as rf
+import snp_fct
 import sys
 sys.path.append('../')
 import vector_fitting
@@ -21,24 +21,16 @@ import fit_s
 #spec.loader.exec_module(vectorFitting)
 
 
-def get_z0(s1p_file):
-    z0 = []
-    with open(s1p_file) as f:
-        for l in f:
-            if '! Port Impedance' in l:
-                z0_str = list(filter(None, l[len('! Port Impedance'):].split(' ')))
-                z0.append(float(z0_str[0]) + 1j*float(z0_str[1]))
-    return z0
-
 if __name__ == '__main__':
     s1p_file = 'SIW_ant_39GHz_from_20GHz_to_50GHz.s1p'
-    ant_data = rf.Network(s1p_file)
-    freq = ant_data.f[500:]
-    cs = freq*2j*np.pi
-    s_data = ant_data.s.reshape(len(ant_data))[500:]
-    z0_data = np.array(get_z0(s1p_file)[500:])
-    z_data = z0_data * (1+s_data) / (1-s_data)
+    freq, n, z_data, s_data, z0_data = snp_fct.read_snp(s1p_file)
+    
+    freq = freq[500:]
+    s_data = s_data[500:]
+    z0_data = z0_data[500:]
+    z_data = z_data[500:]
     s_data = (z_data-50) / (z_data+50)
+    cs = freq*2j*np.pi
     z0 = 50
     
     #poles, residues, d, h = vector_fitting.vector_fitting_rescale(z_data, cs, n_poles=20, n_iters=20, has_d=1, has_h=0, fixed_poles=[0])
