@@ -25,7 +25,7 @@ def get_z0(snp_file):
                     z0[i].append(float(z0_str[2*i]) + 1j*float(z0_str[2*i+1]))
     z0 = np.array(z0)
     if n == 1:
-        z0 = z0.reshape(len(z0))
+        z0 = z0.reshape(len(z0[0]))
     return np.array(z0)
 
 

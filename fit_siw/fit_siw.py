@@ -22,7 +22,8 @@ import fit_s
 
 
 if __name__ == '__main__':
-    s1p_file = 'SIW_ant_39GHz_from_20GHz_to_50GHz.s1p'
+    #s1p_file = 'SIW_ant_39GHz_from_20GHz_to_50GHz.s1p'
+    s1p_file = 'single_SIW_antenna_39GHz_50mil.s1p'
     freq, n, z_data, s_data, z0_data = snp_fct.read_snp(s1p_file)
     
     freq = freq[500:]
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     z0 = 50
     
     #poles, residues, d, h = vector_fitting.vector_fitting_rescale(z_data, cs, n_poles=20, n_iters=20, has_d=1, has_h=0, fixed_poles=[0])
-    poles, residues, d, h = fit_z.fit_z(z_data, cs, n_poles=19, n_iters=20, has_d=1, has_h=0, reflect_z=[0])
+    poles, residues, d, h = fit_z.fit_z(z_data, cs, n_poles=14, n_iters=20, has_d=1, has_h=0)
     f_fit = vector_fitting.model(cs, poles, residues, d, h)
     
     print(poles)
@@ -60,6 +61,7 @@ if __name__ == '__main__':
     
     bound = -np.pi/2*(sum(1/s_poles)+sum(1/s_zeros))
     print('Bound is {:.5e}'.format(bound.real))
+    print('BW is {:.5e}'.format(bound.real/2/np.pi/np.log(1/0.2)*(2*np.pi*39e9)**2))
     
     plt.figure()
     plt.semilogx(np.abs(s_all), 20*np.log10(np.abs(f_fit_all)), 'b-')
@@ -81,6 +83,7 @@ if __name__ == '__main__':
     fs_fit_all = vector_fitting.model(s_all, poles, residues, d, h)
     bound = -np.pi/2*(sum(poles)+sum(s_zeros))
     print('Bound is {:.5e}'.format(bound.real))
+    print('BW is {:.5e}'.format(bound.real/2/np.pi/np.log(1/0.2)))
     
     plt.figure()
     plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(s_data)), 'b-')
