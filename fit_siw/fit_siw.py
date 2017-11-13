@@ -13,6 +13,7 @@ sys.path.append('../')
 import vector_fitting
 import fit_z
 import fit_s
+import bound_fct
 
 ## import from a specific directory
 #import importlib.util
@@ -84,12 +85,17 @@ if __name__ == '__main__':
     fs_fit = vector_fitting.model(cs, poles, residues, d, h)
     s_zeros = vector_fitting.calculate_zeros(poles, residues, d)
     fs_fit_all = vector_fitting.model(s_all, poles, residues, d, h)
-    bound = -np.pi/2*(sum(poles)+sum(s_zeros))
-    print('Bound is {:.5e}'.format(bound.real))
-    print('BW is {:.5e}'.format(bound.real/2/np.pi/np.log(1/0.2)))
-    bound = -np.pi/2*(sum(1/poles)+sum(1/s_zeros))
-    print('Bound is {:.5e}'.format(bound.real))
-    print('BW is {:.5e}'.format(bound.real/2/np.pi/np.log(1/0.2)*(2*np.pi*39e9)**2))
+    
+    bound, bw = bound_fct.bound_s(poles, residues, d, 0, f0=39e9)
+    print('Bound is {:.5e}'.format(bound))
+    print('BW is {:.5e}'.format(bw))
+    
+    bound, bw = bound_fct.bound_s(poles, residues, d, np.inf)
+    print('Bound is {:.5e}'.format(bound))
+    print('BW is {:.5e}'.format(bw))
+    
+    bound_error = bound_fct.bound_error_s(s_data, cs, poles, residues, d, np.inf)
+    print('Bound error is {:.5e}'.format(bound_error))
     
     plt.figure()
     plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(s_data)), 'b-')

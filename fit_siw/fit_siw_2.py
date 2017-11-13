@@ -14,6 +14,7 @@ import vector_fitting
 import matrix_fitting
 import fit_z
 import fit_s
+import bound_fct
 
 
 if __name__ == '__main__':
@@ -58,10 +59,12 @@ if __name__ == '__main__':
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude (dB)')
     
-    zeros_even = vector_fitting.calculate_zeros(poles_even, residues_even, d_even)
-    bound_even = -np.pi/2*(sum(poles_even)+sum(zeros_even))
-    print('Bound even is {:.5e}'.format(bound_even.real))
-    print('BW even is {:.5e}'.format(bound_even.real/2/np.pi/np.log(1/0.2)))
+    bound_even, bw_even = bound_fct.bound_s(poles_even, residues_even, d_even, np.inf)
+    print('Bound even is {:.5e}'.format(bound_even))
+    print('BW even is {:.5e}'.format(bw_even))
+    
+    bound_error_even = bound_fct.bound_error_s(s_even, cs, poles_even, residues_even, d_even, np.inf)
+    print('Bound error is {:.5e}'.format(bound_error_even))
     
     # Odd mode
     poles_odd, residues_odd, d_odd, h_odd = fit_s.fit_s(s_odd, cs, n_poles=17, n_iters=20, s_inf=1)
@@ -74,10 +77,12 @@ if __name__ == '__main__':
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude (dB)')
     
-    zeros_odd = vector_fitting.calculate_zeros(poles_odd, residues_odd, d_odd)
-    bound_odd = -np.pi/2*(sum(poles_odd)+sum(zeros_odd))
-    print('Bound odd is {:.5e}'.format(bound_odd.real))
-    print('BW odd is {:.5e}'.format(bound_odd.real/2/np.pi/np.log(1/0.2)))
+    bound_odd, bw_odd = bound_fct.bound_s(poles_odd, residues_odd, d_odd, np.inf)
+    print('Bound even is {:.5e}'.format(bound_odd))
+    print('BW even is {:.5e}'.format(bw_odd))
+    
+    bound_error_odd = bound_fct.bound_error_s(s_odd, cs, poles_odd, residues_odd, d_odd, np.inf)
+    print('Bound error is {:.5e}'.format(bound_error_odd))
     
     # Overall passivity
     s_even_fit_all = vector_fitting.model(cs_all, poles_even, residues_even, d_even, h_even)
