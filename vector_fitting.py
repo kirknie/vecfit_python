@@ -118,6 +118,7 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z
     
     
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
+    #np.savetxt("foo.csv", A, delimiter=",")
     
     #residues = x[:nP]
     #d = x[nP]

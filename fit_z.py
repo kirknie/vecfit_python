@@ -11,7 +11,7 @@ import vector_fitting
 
 
 def fit_z(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[], reflect_z=[]):
-    poles, residues, d, h = vector_fitting.vector_fitting(f, s, n_poles=n_poles, n_iters=n_iters, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles, reflect_z=reflect_z)
+    poles, residues, d, h = vector_fitting.vector_fitting_rescale(f, s, n_poles=n_poles, n_iters=n_iters, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles, reflect_z=reflect_z)
     return poles, residues, d, h
 
 
