@@ -23,8 +23,10 @@ if __name__ == '__main__':
     freq, n, z, s, z0 = snp_fct.read_snp(s2p_file)
     s_50 = np.zeros(z.shape, dtype=z.dtype)
     cs = freq*2j*np.pi
+    z0 = 50
+    z0 = 190
     for i in range(len(freq)):
-        s_50[:, :, i] = np.matrix(z[:, :, i]/50-np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i]/50+np.identity(n)))
+        s_50[:, :, i] = np.matrix(z[:, :, i]/z0-np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i]/z0+np.identity(n)))
     
 #    # Try matrix_fitting first
 #    poles, residues, d, h = matrix_fitting.matrix_fitting(s_50, cs, n_poles=38, n_iters=20, has_h=0)

@@ -31,9 +31,10 @@ if __name__ == '__main__':
 #    s_data = s_data[500:]
 #    z0_data = z0_data[500:]
 #    z_data = z_data[500:]
-    s_data = (z_data-50) / (z_data+50)
-    cs = freq*2j*np.pi
     z0 = 50
+    z0 = 190
+    s_data = (z_data-z0) / (z_data+z0)
+    cs = freq*2j*np.pi
     
     #poles, residues, d, h = vector_fitting.vector_fitting_rescale(z_data, cs, n_poles=20, n_iters=20, has_d=1, has_h=0, fixed_poles=[0])
     poles, residues, d, h = fit_z.fit_z(z_data, cs, n_poles=18, n_iters=20, has_d=1, has_h=1)
@@ -81,7 +82,7 @@ if __name__ == '__main__':
     
     
     # Try to fit S
-    poles, residues, d, h = fit_s.fit_s(s_data, cs, n_poles=17, n_iters=20, s_dc=0, s_inf=1, pole_wt=0)
+    poles, residues, d, h = fit_s.fit_s(s_data, cs, n_poles=18, n_iters=20, s_dc=0, s_inf=1, pole_wt=0)
     fs_fit = vector_fitting.model(cs, poles, residues, d, h)
     s_zeros = vector_fitting.calculate_zeros(poles, residues, d)
     fs_fit_all = vector_fitting.model(s_all, poles, residues, d, h)
