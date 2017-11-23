@@ -27,6 +27,12 @@ if __name__ == '__main__':
     z0 = 190
     for i in range(len(freq)):
         s_50[:, :, i] = np.matrix(z[:, :, i]/z0-np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i]/z0+np.identity(n)))
+
+    start = 500
+    stop = 1501
+    freq = freq[start:stop]
+    cs = cs[start:stop]
+    s_50 = s_50[:, :, start:stop]
     
 #    # Try matrix_fitting first
 #    poles, residues, d, h = matrix_fitting.matrix_fitting(s_50, cs, n_poles=38, n_iters=20, has_h=0)
@@ -51,7 +57,7 @@ if __name__ == '__main__':
     cs_all = np.logspace(10, 12, 1e5)*1j
     
     # Even mode
-    poles_even, residues_even, d_even, h_even = fit_s.fit_s(s_even, cs, n_poles=19, n_iters=20, s_inf=1)
+    poles_even, residues_even, d_even, h_even = fit_s.fit_s(s_even, cs, n_poles=14, n_iters=20, s_inf=1)
     s_even_fit = vector_fitting.model(cs, poles_even, residues_even, d_even, h_even)
     
     plt.figure()
@@ -69,7 +75,7 @@ if __name__ == '__main__':
     print('Bound error is {:.5e}'.format(bound_error_even))
     
     # Odd mode
-    poles_odd, residues_odd, d_odd, h_odd = fit_s.fit_s(s_odd, cs, n_poles=17, n_iters=20, s_inf=1)
+    poles_odd, residues_odd, d_odd, h_odd = fit_s.fit_s(s_odd, cs, n_poles=13, n_iters=20, s_inf=1, pole_wt=0)  # pole_wt=5e-13
     s_odd_fit = vector_fitting.model(cs, poles_odd, residues_odd, d_odd, h_odd)
     
     plt.figure()
@@ -80,8 +86,8 @@ if __name__ == '__main__':
     plt.ylabel('Amplitude (dB)')
     
     bound_odd, bw_odd = bound_fct.bound_s(poles_odd, residues_odd, d_odd, np.inf)
-    print('Bound even is {:.5e}'.format(bound_odd))
-    print('BW even is {:.5e}'.format(bw_odd))
+    print('Bound odd is {:.5e}'.format(bound_odd))
+    print('BW odd is {:.5e}'.format(bw_odd))
     
     bound_error_odd = bound_fct.bound_error_s(s_odd, cs, poles_odd, residues_odd, d_odd, np.inf)
     print('Bound error is {:.5e}'.format(bound_error_odd))
