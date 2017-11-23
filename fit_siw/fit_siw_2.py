@@ -57,7 +57,7 @@ if __name__ == '__main__':
     cs_all = np.logspace(10, 12, 1e5)*1j
     
     # Even mode
-    poles_even, residues_even, d_even, h_even = fit_s.fit_s(s_even, cs, n_poles=14, n_iters=20, s_inf=1)
+    poles_even, residues_even, d_even, h_even = fit_s.fit_s(s_even, cs, n_poles=14, n_iters=20, s_inf=1, bound_wt=1e-13)
     s_even_fit = vector_fitting.model(cs, poles_even, residues_even, d_even, h_even)
     
     plt.figure()
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     print('Bound error is {:.5e}'.format(bound_error_even))
     
     # Odd mode
-    poles_odd, residues_odd, d_odd, h_odd = fit_s.fit_s(s_odd, cs, n_poles=13, n_iters=20, s_inf=1, pole_wt=0)  # pole_wt=5e-13
+    poles_odd, residues_odd, d_odd, h_odd = fit_s.fit_s(s_odd, cs, n_poles=13, n_iters=20, s_inf=1, pole_wt=0, bound_wt=1e-13)  # pole_wt=5e-13
     s_odd_fit = vector_fitting.model(cs, poles_odd, residues_odd, d_odd, h_odd)
     
     plt.figure()

@@ -56,7 +56,7 @@ def pair_poles(poles):
     
     return poles_pair
 
-def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0):
+def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0, bound_wt=0):
     # Function generates a new set of poles
     # Should create a class and let z_fitting inherit the class
     
@@ -114,15 +114,40 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z
                 A[-1, -nP_iter+i] = 2*pole_wt
             elif poles_pair[i] == 2:
                 A[-1, -nP_iter+i] = 0*pole_wt
-    
+    elif bound_wt > 0:  # no need s_inf here, equations same for s_inf = 1 or -1
+        A = np.vstack([A, np.zeros((1, nP+has_d+has_h+nP_iter), dtype=np.complex64)])
+        b = np.concatenate([b, [np.real(np.sum(poles))*2*bound_wt]])
+        for i, p in enumerate(poles):
+            if poles_pair[i] == 0:
+                A[-1, i] = -1*pole_wt
+                A[-1, -nP_iter+i] = 1*bound_wt
+            elif poles_pair[i] == 1:
+                A[-1, i] = -2*pole_wt
+                A[-1, -nP_iter+i] = 2*bound_wt
+            elif poles_pair[i] == 2:
+                A[-1, i] = -0*pole_wt
+                A[-1, -nP_iter+i] = 0*bound_wt
     
     
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
     #np.savetxt("foo.csv", A, delimiter=",")
     
-    #residues = x[:nP]
-    #d = x[nP]
-    #h = x[nP+1]
+    # Calculate the residules, d, and h just for reference
+    residues = np.complex64(x[:nP])
+    for i, pp in enumerate(poles_pair):
+       if pp == 1:
+           r1, r2 = residues[i:i+2]
+           residues[i] = r1 - 1j*r2
+           residues[i+1] = r1 + 1j*r2
+    d = 0
+    h = 0
+    if has_d:
+        d = x[nP]
+    if has_h:
+        h = x[nP+has_d]
+    if reflect_z:
+        s0 = reflect_z[0]
+        d = np.sum([-(r/(s0-p)+r/(-s0-p))/2 for p, r in zip(poles, residues)])
     
     # Calculate the new poles by following Appendix B
     A = np.diag(poles)
@@ -145,7 +170,7 @@ def vector_fitting_step(f, s, poles, has_d=1, has_h=1, fixed_poles=[], reflect_z
     new_poles[unstable] -= 2*np.real(new_poles)[unstable]
     
     # Return new poles
-    return new_poles
+    return new_poles, residues, d, h
 
 def calculate_residues(f, s, poles, has_d=1, has_h=1, reflect_z=[]):
     # Function uses the input poles to calculate residues
@@ -239,7 +264,7 @@ def calculate_zeros(poles, residues, d):
     return z
 
 
-def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0):
+def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[], reflect_z=[], pole_wt=0, bound_wt=0):
     # Function runs vector fitting
     # Assume w is imaginary, non-negative and in a ascending order
     # reflect_z needs to be in conjugate pairs and in the RHP, only support 1 reflection point now
@@ -250,10 +275,11 @@ def vector_fitting(f, s, n_poles=10, n_iters=10, has_d=1, has_h=1, fixed_poles=[
     poles = init_poles(w[-1], n_poles)
     
     for loop in range(n_iters):
-        poles = vector_fitting_step(f, s, poles, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles, reflect_z=reflect_z, pole_wt=pole_wt)
+        poles, residues, d, h = vector_fitting_step(f, s, poles, has_d=has_d, has_h=has_h, fixed_poles=fixed_poles, reflect_z=reflect_z, pole_wt=pole_wt, bound_wt=bound_wt)
     
-    poles = np.concatenate([poles, fixed_poles])
-    residues, d, h = calculate_residues(f, s, poles, has_d=has_d, has_h=has_h, reflect_z=reflect_z)
+    if not (pole_wt <=0 and bound_wt > 0):
+        poles = np.concatenate([poles, fixed_poles])  # fixed_poles only for fitting z
+        residues, d, h = calculate_residues(f, s, poles, has_d=has_d, has_h=has_h, reflect_z=reflect_z)
     
     return poles, residues, d, h
 

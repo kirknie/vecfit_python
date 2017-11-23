@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import vector_fitting
 
 
-def fit_s(f, s, n_poles=10, n_iters=10, s_dc=0, s_inf=0, pole_wt=0):
+def fit_s(f, s, n_poles=10, n_iters=10, s_dc=0, s_inf=0, pole_wt=0, bound_wt=0):
     # Call vector_fitting function and do some post processing
     if s_dc and s_inf:
         raise RuntimeError('Does not support dc and inf reflection simultaneously!')
@@ -26,11 +26,11 @@ def fit_s(f, s, n_poles=10, n_iters=10, s_dc=0, s_inf=0, pole_wt=0):
             raise RuntimeError('Does not support s_dc not +/-1!')
     elif s_inf:
         if s_inf == 1:  # 1-s is bounded
-            poles, residues, d, h = vector_fitting.vector_fitting(1-f, s, n_poles, n_iters, has_d=0, has_h=0, pole_wt=pole_wt)
+            poles, residues, d, h = vector_fitting.vector_fitting(1-f, s, n_poles, n_iters, has_d=0, has_h=0, pole_wt=pole_wt, bound_wt=bound_wt)
             d = 1-d
             residues = -residues
         elif s_inf == -1:  # 1+s is bounded
-            poles, residues, d, h = vector_fitting.vector_fitting(1+f, s, n_poles, n_iters, has_d=0, has_h=0, pole_wt=pole_wt)
+            poles, residues, d, h = vector_fitting.vector_fitting(1+f, s, n_poles, n_iters, has_d=0, has_h=0, pole_wt=pole_wt, bound_wt=bound_wt)
             d -= 1
         else:  # not supported
             raise RuntimeError('Does not support s_inf not +/-1!')
