@@ -73,6 +73,10 @@ if __name__ == '__main__':
     
     bound_error_even = bound_fct.bound_error_s(s_even, cs, poles_even, residues_even, d_even, np.inf)
     print('Bound error is {:.5e}'.format(bound_error_even))
+    integral_even = bound_fct.bound_integral(cs.imag, np.abs(s_even), np.inf)
+    print('The inegral of the odd is {:.5e}'.format(integral_even))
+    
+    bound_fct.plot_improved_bound(poles_even, residues_even, d_even, 2e10, 4e11)
     
     # Odd mode
     poles_odd, residues_odd, d_odd, h_odd = fit_s.fit_s(s_odd, cs, n_poles=17, n_iters=20, s_inf=1, pole_wt=0, bound_wt=5e-12)  # pole_wt=5e-13
@@ -91,6 +95,10 @@ if __name__ == '__main__':
     
     bound_error_odd = bound_fct.bound_error_s(s_odd, cs, poles_odd, residues_odd, d_odd, np.inf)
     print('Bound error is {:.5e}'.format(bound_error_odd))
+    integral_odd = bound_fct.bound_integral(cs.imag, np.abs(s_odd), np.inf)
+    print('The inegral of the odd is {:.5e}'.format(integral_odd))
+    
+    bound_fct.plot_improved_bound(poles_odd, residues_odd, d_odd, 2e10, 6e11)
     
     # Overall passivity
     s_even_fit_all = vector_fitting.model(cs_all, poles_even, residues_even, d_even, h_even)

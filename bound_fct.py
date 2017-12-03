@@ -6,6 +6,7 @@ Created on Sun Nov 12 18:31:51 2017
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 import vector_fitting
 
 
@@ -42,6 +43,34 @@ def bound_error_s(f, s, poles, residues, d, reflect, tau=0.2):
     # Calculate rho first (single load)
     rho = (2*np.abs(f_error))/(1-np.power(np.abs(f), 2))
     int_fct = f_integral(s.imag, reflect) / 2 * np.log(1 + (1-tau**2)/tau**2 * rho)
-    delta_b = np.sum((int_fct[:-1] + int_fct[1:]) / 2 * (s.imag[1:] - s.imag[:-1]))
+    # delta_b = np.sum((int_fct[:-1] + int_fct[1:]) / 2 * (s.imag[1:] - s.imag[:-1]))
+    delta_b = num_integral(s.imag, int_fct)
     return delta_b
+
+def num_integral(x, y):
+    return np.sum((y[:-1] + y[1:]) / 2 * (x[1:] - x[:-1]))
+
+def bound_integral(w, r, reflect):
+    f = f_integral(w, reflect) * np.log(1/r)
+    return num_integral(w, f)
     
+def plot_improved_bound(poles, residues, d, real_limit, imag_limit):
+    sample = 2000
+    x = np.linspace(-real_limit, 0, sample)
+    y = np.linspace(-imag_limit, imag_limit, 2*sample)
+    xv, yv = np.meshgrid(x, y, sparse=False, indexing='xy')
+    s = xv + 1j*yv
+    f = vector_fitting.model(s, poles, residues, d, 0)
+    
+    # do the plot
+    plt.figure()
+    plt.contourf(x, y, 2-np.abs(f), [1, 2])
+    
+    zeros = vector_fitting.calculate_zeros(poles, residues, d)
+    plt.plot(poles.real, poles.imag, 'x')
+    plt.plot(zeros.real, zeros.imag, 'o')
+    plt.axis([-real_limit, 0, -imag_limit, imag_limit])
+    plt.xlabel('Re\{s\}')
+    plt.ylabel('Im\{s\}')
+    
+    return s, f

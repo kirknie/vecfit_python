@@ -98,6 +98,11 @@ if __name__ == '__main__':
     bound_error = bound_fct.bound_error_s(s_data, cs, poles, residues, d, np.inf)
     print('Bound error is {:.5e}'.format(bound_error))
     
+    ant_integral = bound_fct.bound_integral(cs.imag, np.abs(s_data), np.inf)
+    print('The inegral of the antenna is {:.5e}'.format(ant_integral))
+    
+    bound_fct.plot_improved_bound(poles, residues, d, 1.2e10, 4e11)
+    
     plt.figure()
     plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(s_data)), 'b-')
     plt.plot(np.abs(cs)/2/np.pi, 20*np.log10(np.abs(fs_fit)), 'r--')
