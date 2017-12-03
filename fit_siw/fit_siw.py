@@ -82,7 +82,7 @@ if __name__ == '__main__':
     
     
     # Try to fit S
-    poles, residues, d, h = fit_s.fit_s(s_data, cs, n_poles=18, n_iters=20, s_dc=0, s_inf=1, pole_wt=0, bound_wt=2e-12)
+    poles, residues, d, h = fit_s.fit_s(s_data, cs, n_poles=18, n_iters=20, s_dc=0, s_inf=1, pole_wt=0, bound_wt=1.2e-12)
     fs_fit = vector_fitting.model(cs, poles, residues, d, h)
     s_zeros = vector_fitting.calculate_zeros(poles, residues, d)
     fs_fit_all = vector_fitting.model(s_all, poles, residues, d, h)
@@ -112,4 +112,5 @@ if __name__ == '__main__':
     
     plt.show()
     
+    print('check s', max(np.abs(fs_fit_all)))
     
