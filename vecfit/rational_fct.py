@@ -51,6 +51,7 @@ class RationalFct:
         return RationalFct(p, r, d, h)
 
     def model(self, s):
+        s = np.array(s)
         f = sum(r/(s-p) for (p, r) in zip(self.pole, self.residue))
         if self.const is not None:
             f += self.const
@@ -58,15 +59,16 @@ class RationalFct:
             f += s*self.linear
         return f
 
-    def plot(self, s, x_scale=None, y_scale=None, **kwargs):
+    def plot(self, s, ax=None, x_scale=None, y_scale=None, **kwargs):
         x = np.abs(s)
         y = self.model(s)
+        fig = plt if ax is None else ax
 
-        plt_fct = plt.plot
+        plt_fct = fig.plot
         if x_scale == 'linear':
-            plt_fct = plt.plot
+            plt_fct = fig.plot
         elif x_scale == 'log':
-            plt_fct = plt.semilogx
+            plt_fct = fig.semilogx
         if y_scale == 'linear':
             pass
         elif y_scale == 'db':

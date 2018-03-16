@@ -103,6 +103,11 @@ def vector_fitting_rescale(f, s, *args, **kwargs):
     s_scale = abs(s[-1])
     f_scale = abs(f[-1])
 
+    if 'fixed_pole' in kwargs and kwargs['fixed_pole'] is not None:
+        kwargs['fixed_pole'] = [p/s_scale for p in kwargs['fixed_pole']]
+    if 'reflect_z' in kwargs and kwargs['reflect_z'] is not None:
+        kwargs['reflect_z'] /= s_scale
+
     f_model = vector_fitting(f/f_scale, s/s_scale, *args, **kwargs)
     f_model.pole *= s_scale
     f_model.residue *= f_scale * s_scale
@@ -200,8 +205,8 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
             rk[i+1] = r1 + 1j*r2
             if i >= n_fixed:
                 q1, q2 = qk[i-n_fixed:i-n_fixed+2]
-                qk[i] = q1 - 1j * q2
-                qk[i + 1] = q1 + 1j * q2
+                qk[i-n_fixed] = q1 - 1j * q2
+                qk[i-n_fixed + 1] = q1 + 1j * q2
     dk = x[n_pole] if col_d else None
     hk = x[n_pole+col_d] if col_h else None
     pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
