@@ -75,7 +75,7 @@ def calculate_zero(pole, residue, const):
     return z
 
 
-def vector_fitting(f, s, n_pole=10, n_iters=10, has_const=True, has_linear=True, fixed_pole=None, reflect_z=None,
+def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None, reflect_z=None,
                    bound_wt=None):
     if reflect_z is not None and not has_const:
         # has_const = True
@@ -91,7 +91,7 @@ def vector_fitting(f, s, n_pole=10, n_iters=10, has_const=True, has_linear=True,
         p = init_pole(w[-1], n_pole)
     fk = RationalFct(p, residue=None)  # need to be updated before use
 
-    for k in range(n_iters):
+    for k in range(n_iter):
         fk = iteration_step(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole,
                             reflect_z=reflect_z, bound_wt=bound_wt)
     f_model = final_step(f, s, fk, has_const=has_const, has_linear=has_linear, reflect_z=reflect_z, bound_wt=bound_wt)
@@ -99,15 +99,17 @@ def vector_fitting(f, s, n_pole=10, n_iters=10, has_const=True, has_linear=True,
     return f_model
 
 
-def vector_fitting_rescale(f, s, **kwargs):
+def vector_fitting_rescale(f, s, *args, **kwargs):
     s_scale = abs(s[-1])
     f_scale = abs(f[-1])
 
-    f_model = vector_fitting(f/f_scale, s/s_scale, **kwargs)
+    f_model = vector_fitting(f/f_scale, s/s_scale, *args, **kwargs)
     f_model.pole *= s_scale
     f_model.residue *= f_scale * s_scale
-    f_model.const *= f_scale
-    f_model.linear *= f_scale / s_scale
+    if f_model.const is not None:
+        f_model.const *= f_scale
+    if f_model.linear is not None:
+        f_model.linear *= f_scale / s_scale
 
     return f_model
 
