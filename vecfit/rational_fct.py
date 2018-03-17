@@ -7,7 +7,7 @@ Created on Tue Mar 13 16:31:51 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
-from .vector_fitting import calculate_zero
+from . import vector_fitting
 
 
 class RationalFct:
@@ -80,7 +80,7 @@ class RationalFct:
 
     def zero(self):
         if self.const:
-            return calculate_zero(self.pole, self.residue, self.const)
+            return vector_fitting.calculate_zero(self.pole, self.residue, self.const)
         else:
             raise RuntimeError('Do not have a constant term')
 
