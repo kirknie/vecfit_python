@@ -7,6 +7,8 @@ Created on Tue Mar 13 16:31:51 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
+import numpy.linalg
+import skrf as rf
 from . import vector_fitting
 
 
@@ -61,7 +63,7 @@ class RationalFct:
         return f
 
     def plot(self, s, ax=None, x_scale=None, y_scale=None, **kwargs):
-        x = np.abs(s)
+        x = np.abs(s)/2/np.pi
         y = self.model(s)
         fig = plt if ax is None else ax
 
@@ -76,7 +78,9 @@ class RationalFct:
             y = 20 * np.log10(np.abs(y))
 
         plt_fct(x, y, **kwargs)
-        plt.grid(True, linestyle='--')
+        fig.grid(True, which='both', linestyle='--')
+        fig.set_xlabel('Frequency (Hz)')
+        fig.set_ylabel('Amplitude (dB)')
 
     def zero(self):
         if self.const:
@@ -110,7 +114,7 @@ class RationalFct:
         return delta_b
 
     def bound_integral(self, s, reflect):
-        f = f_integral(s.imag, reflect) * np.log(1/self.model(s))
+        f = f_integral(s.imag, reflect) * np.log(1/np.abs(self.model(s)))
         return num_integral(s.imag, f)
 
     def plot_improved_bound(self, real_limit, imag_limit, ax=None):
@@ -129,8 +133,8 @@ class RationalFct:
         fig.plot(self.pole.real, self.pole.imag, 'x')
         fig.plot(zero.real, zero.imag, 'o')
         fig.axis([-real_limit, 0, -imag_limit, imag_limit])
-        fig.xlabel('Re\{s\}')
-        fig.ylabel('Im\{s\}')
+        fig.set_xlabel('Re{s}')
+        fig.set_ylabel('Im{s}')
 
         return s, f
 
@@ -151,5 +155,54 @@ def num_integral(x, y):
     return np.sum((y[:-1] + y[1:]) / 2 * (x[1:] - x[:-1]))
 
 
+def get_z0(snp_file):
+    # Input: file name
+    # Output: nxl z0
+    n = int(snp_file[-2])
+    if '.s' + str(n) + 'p' not in snp_file:
+        raise RuntimeError('Error: input file is not snp touchstone file')
+    z0 = [[] for i in range(n)]
+    with open(snp_file) as f:
+        for l in f:
+            if '! Port Impedance' in l:
+                z0_str = list(filter(None, l[len('! Port Impedance'):].split(' ')))
+                for i in range(n):
+                    z0[i].append(float(z0_str[2*i]) + 1j*float(z0_str[2*i+1]))
+    z0 = np.array(z0)
+    if n == 1:
+        z0 = z0.reshape(len(z0[0]))
+    return np.array(z0)
+
+
+def s2z(s, z0):
+    if s.ndim == 1:  # one port
+        z = z0 * (1+s) / (1-s)
+    elif s.ndim == 3:
+        n = s.shape[0]
+        l = s.shape[2]
+        z = np.zeros(s.shape, dtype=s.dtype)
+        for i in range(l):
+            z0_sq = np.matrix(np.diag(np.sqrt(z0[:, i])))
+            s_ele = s[:, :, i]
+            z[:, :, i] = z0_sq * np.matrix(numpy.identity(n)+s_ele) * np.linalg.inv(np.matrix(numpy.identity(n)-s_ele)) * z0_sq
+    else:
+        raise RuntimeError('Error: unexpected S-parameter format')
+    return z
+
+
+def read_snp(snp_file):
+    ant_data = rf.Network(snp_file)
+    z0 = get_z0(snp_file)
+    n = ant_data.number_of_ports
+    freq = ant_data.f
+    l = len(freq)
+    if n == 1:
+        s = ant_data.s.reshape(l)
+    else:
+        s = np.zeros([n, n, l], dtype=np.complex128)
+        for i in range(l):
+            s[:, :, i] = ant_data.s[i, :, :]
+    z = s2z(s, z0)
+    return freq, n, z, s, z0
 
 
