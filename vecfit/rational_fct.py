@@ -114,8 +114,7 @@ class RationalFct:
         return delta_b
 
     def bound_integral(self, s, reflect):
-        f = f_integral(s.imag, reflect) * np.log(1/np.abs(self.model(s)))
-        return num_integral(s.imag, f)
+        return bound_integral(self.model(s), s, reflect)
 
     def plot_improved_bound(self, real_limit, imag_limit, ax=None):
         fig = plt if ax is None else ax
@@ -153,6 +152,10 @@ def f_integral(w, reflect):
 
 def num_integral(x, y):
     return np.sum((y[:-1] + y[1:]) / 2 * (x[1:] - x[:-1]))
+
+
+def bound_integral(f, s, reflect):
+    return num_integral(s.imag, f_integral(s.imag, reflect) * np.log(1/np.abs(f)))
 
 
 def get_z0(snp_file):

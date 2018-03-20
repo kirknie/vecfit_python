@@ -78,6 +78,7 @@ def single_siw():
     print('Bound error is {:.5e}'.format(bound_error))
 
     ant_integral = f_out.bound_integral(cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
     print('The integral of the antenna is {:.5e}'.format(ant_integral))
 
     cs_all = np.logspace(10, 12, 1e5) * 1j
@@ -125,12 +126,13 @@ def coupled_siw():
     bound_error_even = f_even.bound_error(s_even, cs, reflect=np.inf)
     print('Bound error is {:.5e}'.format(bound_error_even))
     integral_even = f_even.bound_integral(cs, reflect=np.inf)
+    integral_even = vecfit.bound_integral(s_even, cs, np.inf)
     print('The integral of the even is {:.5e}'.format(integral_even))
 
     print('check s for even', max(np.abs(f_even.model(cs_all))))
 
     # Odd mode
-    f_odd = vecfit.fit_s(s_odd, cs, n_pole=17, n_iter=20, s_inf=1, bound_wt=0.6)
+    f_odd = vecfit.fit_s(s_odd, cs, n_pole=17, n_iter=20, s_inf=1, bound_wt=0.62)
 
     bound_odd, bw_odd = f_odd.bound(np.inf, f0=39e9)
     print('Bound odd is {:.5e}'.format(bound_odd))
@@ -139,6 +141,7 @@ def coupled_siw():
     bound_error_odd = f_odd.bound_error(s_odd, cs, reflect=np.inf)
     print('Bound error is {:.5e}'.format(bound_error_odd))
     integral_odd = f_odd.bound_integral(cs, reflect=np.inf)
+    integral_odd = vecfit.bound_integral(s_odd, cs, np.inf)
     print('The integral of the odd is {:.5e}'.format(integral_odd))
 
     print('check s for odd', max(np.abs(f_odd.model(cs_all))))
