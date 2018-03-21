@@ -54,6 +54,58 @@ def example1():
     plt.show()
 
 
+def example2():
+    s_test = 1j * np.linspace(1, 1e5, 800)
+    poles_test = [-4500,
+                  -41000,
+                  -100 + 5000j, -100 - 5000j,
+                  -120 + 15000j, -120 - 15000j,
+                  -3000 + 35000j, -3000 - 35000j,
+                  -200 + 45000j, -200 - 45000j,
+                  -1500 + 45000j, -1500 - 45000j,
+                  -500 + 70000j, -500 - 70000j,
+                  -1000 + 73000j, -1000 - 73000j,
+                  -2000 + 90000j, -2000 - 90000j]
+    tmp_list = [-3000,
+                -83000,
+                -5 + 7000j, -5 - 7000j,
+                -20 + 18000j, -20 - 18000j,
+                6000 + 45000j, 6000 - 45000j,
+                40 + 60000j, 40 - 60000j,
+                90 + 10000j, 90 - 10000j,
+                50000 + 80000j, 50000 - 80000j,
+                1000 + 45000j, 1000 - 45000j,
+                -5000 + 92000j, -5000 - 92000j]
+    ndim = 2
+    n_pole = len(poles_test)
+    ns = len(s_test)
+
+    residues_test = np.zeros([ndim, ndim, n_pole], dtype=np.complex128)
+    for i, r in enumerate(tmp_list):
+        residues_test[:, :, i] = r * np.array([[1, 0.5], [0.5, 1]])
+
+    d_test = .2 * np.array([[1, -0.2], [-0.2, 1]])
+    h_test = 5e-4 * np.array([[1, -0.5], [-0.5, 1]])
+
+    f_in = vecfit.RationalMtx(poles_test, residues_test, d_test, h_test)
+    f_test = f_in.model(s_test)
+
+    # f_out = vecfit.matrix_fitting(f_test, s_test, n_pole=18, n_iter=20, has_const=True, has_linear=True)
+    f_out = vecfit.matrix_fitting_rescale(f_test, s_test, n_pole=18, n_iter=10, has_const=True, has_linear=True, fixed_pole=[-1000, -5+6000j, -5-6000j])
+    f_fit = f_out.model(s_test)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    # f_in.plot(s_test, ax=ax, x_scale='log', y_scale='db', color='b')
+    # f_out.plot(s_test, ax=ax, y_scale='db', color='r', linestyle='--')
+    # (f_out-f_in).plot(s_test, ax=ax, y_scale='db', color='k', linestyle='--')
+    plt.plot(np.abs(s_test)/2/np.pi, 20 * np.log10(np.abs(f_test[0, 0, :])), 'b-')
+    plt.plot(np.abs(s_test)/2/np.pi, 20 * np.log10(np.abs(f_fit[0, 0, :])), 'r--')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude (dB)')
+    plt.show()
+
+
 def single_siw():
     s1p_file = './resource/single_SIW_antenna_39GHz_50mil.s1p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
@@ -172,7 +224,8 @@ def coupled_siw():
 
 if __name__ == '__main__':
     # example1()
+    example2()
     # single_siw()
-    coupled_siw()
+    # coupled_siw()
 
 

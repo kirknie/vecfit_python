@@ -209,3 +209,135 @@ def read_snp(snp_file):
     return freq, n, z, s, z0
 
 
+class RationalMtx:
+    def __init__(self, pole, residue, const=None, linear=None):
+        if residue.ndim == 3 and residue.shape[0] == residue.shape[1] and residue.shape[2] == len(pole):
+            self.ndim = residue.shape[0]
+            self.pole = np.array(pole)
+            self.residue = np.array(residue)
+            self.const = const
+            self.linear = linear
+        else:
+            raise RuntimeError('RationalMtx: Input format not expected')
+
+    def __add__(self, other):
+        p = np.concatenate([self.pole, other.pole])
+        r = np.concatenate([self.residue, other.residue], axis=2)
+        d = self.const
+        if other.const is not None:
+            if d is None:
+                d = other.const
+            else:
+                d += other.const
+        h = self.linear
+        if other.linear is not None:
+            if h is None:
+                h = other.linear
+            else:
+                h += other.linear
+        return RationalFct(p, r, d, h)
+
+    def __sub__(self, other):
+        p = np.concatenate([self.pole, other.pole])
+        r = np.concatenate([self.residue, -other.residue], axis=2)
+        d = self.const
+        if other.const is not None:
+            if d is None:
+                d = -other.const
+            else:
+                d -= other.const
+        h = self.linear
+        if other.linear is not None:
+            if h is None:
+                h = -other.linear
+            else:
+                h -= other.linear
+        return RationalFct(p, r, d, h)
+
+    def model(self, s):
+        s = np.array(s)
+        ns = len(s)
+        f = np.zeros([self.ndim, self.ndim, ns], dtype=np.complex128)
+        for i, si in enumerate(s):
+            f[:, :, i] = np.sum(self.residue[:, :, j] / (si - p) for j, p in enumerate(self.pole))
+            if self.const is not None:
+                f[:, :, i] += self.const
+            if self.linear is not None:
+                f[:, :, i] += si * self.linear
+        return f
+
+
+def mat2vec(f_mat, symmetric=True):
+    # Function to transform a symmetric matrix into a vector form
+    # Input: [ndim, ndim, ns]
+    # Output: [ndim*(ndim+1)/2, ns]
+    dim_one = False
+    if f_mat.ndim == 2:
+        dim_one = True
+        ns = 1
+        f_mat = f_mat.reshape(list(f_mat.shape) + [1])
+    elif f_mat.ndim == 3:
+        ns = np.size(f_mat, 2)
+    else:
+        raise RuntimeError('Unexpected input data format!')
+    ndim = np.size(f_mat, 0)
+
+    idx = 0
+    if symmetric:
+        f_vec = np.zeros([ndim * (ndim + 1) // 2, ns], dtype=np.complex128)
+        for i in range(ndim):
+            for j in range(i, ndim):
+                f_vec[idx, :] = f_mat[i, j, :]
+                idx += 1
+    else:
+        f_vec = np.zeros([ndim * ndim, ns], dtype=np.complex128)
+        for i in range(ndim):
+            for j in range(ndim):
+                f_vec[idx, :] = f_mat[i, j, :]
+                idx += 1
+
+    if dim_one:  # Output a single vector
+        f_vec = f_vec.reshape(np.size(f_vec, 0))
+    return f_vec
+
+
+def vec2mat(f_vec, symmetric=True):
+    # Function to transform a vector form into a symmetric matrix
+    # Input: [ndim*(ndim+1)/2, ns]
+    # Output: [ndim, ndim, ns]
+    dim_one = False
+    if f_vec.ndim == 1:
+        dim_one = True
+        ns = 1
+        f_vec = f_vec.reshape(list(f_vec.shape) + [1])
+    elif f_vec.ndim == 2:
+        ns = np.size(f_vec, 1)
+    else:
+        raise RuntimeError('Unexpected input data format!')
+    ndim = np.size(f_vec, 0)
+    if symmetric:
+        ndim = int(np.sqrt(ndim * 8 + 1) - 1) // 2  # calculate the dimension of the matrix
+    else:
+        ndim = int(np.sqrt(ndim))
+
+    f_mat = np.zeros([ndim, ndim, ns], dtype=np.complex128)
+    idx = 0
+    if symmetric:
+        for i in range(ndim):
+            for j in range(i, ndim):
+                f_mat[i, j, :] = f_vec[idx, :]
+                if i != j:
+                    f_mat[j, i, :] = f_vec[idx, :]
+                idx += 1
+    else:
+        for i in range(ndim):
+            for j in range(ndim):
+                f_mat[i, j, :] = f_vec[idx, :]
+                idx += 1
+
+    if dim_one:
+        f_mat = f_mat.reshape([ndim, ndim])
+    return f_mat
+
+
+
