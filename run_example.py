@@ -222,10 +222,50 @@ def coupled_siw():
     plt.show()
 
 
+def dipole():
+    s1p_file = './resource/single_dipole.s1p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
+    # z0 = 50
+    # s_data = (z_data-z0) / (z_data+z0)
+    cs = freq*2j*np.pi
+
+    # Try to fit S
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=3, n_iter=20, s_dc=0, s_inf=-1)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=4, n_iter=20, s_dc=0, s_inf=-1)
+    f_out = vecfit.fit_s(s_data, cs, n_pole=4, n_iter=20, s_dc=0, s_inf=-1, bound_wt=0.1)
+
+    bound, bw = f_out.bound(np.inf, f0=2.4e9)
+    print('Bound is {:.5e}'.format(bound))
+    print('BW is {:.5e}'.format(bw))
+
+    bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+    print('Bound error is {:.5e}'.format(bound_error))
+
+    ant_integral = f_out.bound_integral(cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('The integral of the antenna is {:.5e}'.format(ant_integral))
+
+    cs_all = np.logspace(5, 12, 1e5) * 1j
+    print('check s', max(np.abs(f_out.model(cs_all))))
+
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(111)
+    ax1.plot(freq, 20*np.log10(np.abs(s_data)), color='b')
+    f_out.plot(cs, ax=ax1, x_scale='log', y_scale='db', color='r', linestyle='--')
+    ax1.plot(freq, 20*np.log10(np.abs(s_data-f_out.model(cs))), color='k', linestyle='--')
+
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot(111)
+    f_out.plot_improved_bound(1e11, 4e10, ax=ax2)
+
+    plt.show()
+
+
 if __name__ == '__main__':
     # example1()
-    example2()
+    # example2()
     # single_siw()
     # coupled_siw()
+    dipole()
 
 
