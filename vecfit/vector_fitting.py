@@ -130,10 +130,10 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
 
     # Construct the set of linear equations A*x=b
     # x = [r_i, d, h, q_i]
+    if reflect_z is not None:
+        has_const = False
     col_d = 1 if has_const else 0
     col_h = 1 if has_linear else 0
-    if reflect_z is not None:
-        col_d = 0
 
     # Construct A
     A = np.zeros((n_freq, 2*n_pole + col_d + col_h - n_fixed), dtype=np.complex128)
@@ -227,10 +227,10 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
 
     # Construct the set of linear equations A*x=b
     # x = [r_i, d, h]
+    if reflect_z is not None:
+        has_const = False
     col_d = 1 if has_const else 0
     col_h = 1 if has_linear else 0
-    if reflect_z is not None:
-        col_d = 0
 
     # Construct A
     A = np.zeros((n_freq, n_pole + col_d + col_h), dtype=np.complex128)

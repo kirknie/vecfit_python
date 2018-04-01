@@ -230,9 +230,11 @@ def dipole():
     cs = freq*2j*np.pi
 
     # Try to fit S
-    # f_out = vecfit.fit_s(s_data, cs, n_pole=3, n_iter=20, s_dc=0, s_inf=-1)
-    # f_out = vecfit.fit_s(s_data, cs, n_pole=4, n_iter=20, s_dc=0, s_inf=-1)
-    f_out = vecfit.fit_s(s_data, cs, n_pole=4, n_iter=20, s_dc=0, s_inf=-1, bound_wt=0.1)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=3, n_iter=20, s_inf=-1)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1)
+    f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1, bound_wt=0.3)
+
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=9, n_iter=20, s_dc=1)
 
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     print('Bound is {:.5e}'.format(bound))
