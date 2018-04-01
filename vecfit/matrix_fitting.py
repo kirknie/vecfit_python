@@ -73,10 +73,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole):
             A1[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
             A1[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-        elif pole_pair[i] == 2:
-            A1[:, i] = 1j / (s - p) - 1j / (s - p.conjugate())
-        else:
-            raise RuntimeError("pole_pair[%d] = %d" % (i, pole_pair[i]))
+            A1[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
     if has_const:
         A1[:, n_pole] = 1
     if has_linear:
@@ -108,12 +105,12 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole):
         if pp == 1:
             r1 = np.copy(rk[:, i])
             r2 = np.copy(rk[:, i+1])
-            rk[:, i] = r1 - 1j*r2
-            rk[:, i+1] = r1 + 1j*r2
+            rk[:, i] = r1 + 1j*r2
+            rk[:, i+1] = r1 - 1j*r2
             if i >= n_fixed:
                 q1, q2 = qk[i-n_fixed:i-n_fixed+2]
-                qk[i-n_fixed] = q1 - 1j * q2
-                qk[i-n_fixed + 1] = q1 + 1j * q2
+                qk[i-n_fixed] = q1 + 1j * q2
+                qk[i-n_fixed + 1] = q1 - 1j * q2
     dk = x[n_pole::np.size(A1, 1)] if col_d else None
     hk = x[n_pole+col_d::np.size(A1, 1)] if col_h else None
     pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
@@ -147,10 +144,7 @@ def final_step(f, s, fk, has_const, has_linear):
             A1[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
             A1[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-        elif pole_pair[i] == 2:
-            A1[:, i] = 1j / (s - p) - 1j / (s - p.conjugate())
-        else:
-            raise RuntimeError("pole_pair[%d] = %d" % (i, pole_pair[i]))
+            A1[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
     if has_const:
         A1[:, n_pole] = 1
     if has_linear:
@@ -179,8 +173,8 @@ def final_step(f, s, fk, has_const, has_linear):
         if pp == 1:
             r1 = np.copy(rk[:, i])
             r2 = np.copy(rk[:, i+1])
-            rk[:, i] = r1 - 1j*r2
-            rk[:, i+1] = r1 + 1j*r2
+            rk[:, i] = r1 + 1j*r2
+            rk[:, i+1] = r1 - 1j*r2
     dk = x[n_pole::np.size(A1, 1)] if col_d else None
     hk = x[n_pole+col_d::np.size(A1, 1)] if col_h else None
 

@@ -143,10 +143,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
             A[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
             A[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-        elif pole_pair[i] == 2:
-            A[:, i] = 1j / (s - p) - 1j / (s - p.conjugate())
-        else:
-            raise RuntimeError("pole_pair[%d] = %d" % (i, pole_pair[i]))
+            A[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
         if i >= n_fixed:
             A[:, -n_pole + i] = -A[:, i] * f
     if has_const:
@@ -162,8 +159,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
             elif pole_pair[i] == 1:
                 A[:, i] += -(1 / (s0 - p) + 1 / (-s0 - p)) / 2 - (
                             1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
-            elif pole_pair[i] == 2:
-                A[:, i] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
+                A[:, i+1] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
                             1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
 
     # Form real equations from complex equations
@@ -176,8 +172,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
                 a[0, i] = -np.pi/2
             elif pole_pair[i] == 1:
                 a[0, i] = -np.pi
-            elif pole_pair[i] == 2:
-                a[0, i] = 0
+                a[0, i+1] = 0
             if i >= n_fixed:
                 a[0, -n_pole + i] = -2 * a[0, i]
         a *= bound_wt
@@ -201,12 +196,12 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
     for i, pp in enumerate(pole_pair):
         if pp == 1:
             r1, r2 = rk[i:i+2]
-            rk[i] = r1 - 1j*r2
-            rk[i+1] = r1 + 1j*r2
+            rk[i] = r1 + 1j*r2
+            rk[i+1] = r1 - 1j*r2
             if i >= n_fixed:
                 q1, q2 = qk[i-n_fixed:i-n_fixed+2]
-                qk[i-n_fixed] = q1 - 1j * q2
-                qk[i-n_fixed + 1] = q1 + 1j * q2
+                qk[i-n_fixed] = q1 + 1j * q2
+                qk[i-n_fixed + 1] = q1 - 1j * q2
     dk = x[n_pole] if col_d else None
     hk = x[n_pole+col_d] if col_h else None
     pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
@@ -240,10 +235,7 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
             A[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
             A[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-        elif pole_pair[i] == 2:
-            A[:, i] = 1j / (s - p) - 1j / (s - p.conjugate())
-        else:
-            raise RuntimeError("pole_pair[%d] = %d" % (i, pole_pair[i]))
+            A[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
     if has_const:
         A[:, n_pole] = 1
     if has_linear:
@@ -257,8 +249,7 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
             elif pole_pair[i] == 1:
                 A[:, i] += -(1 / (s0 - p) + 1 / (-s0 - p)) / 2 - (
                             1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
-            elif pole_pair[i] == 2:
-                A[:, i] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
+                A[:, i+1] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
                             1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
 
     # Form real equations from complex equations
@@ -271,8 +262,7 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
                 a[0, i] = -np.pi/2
             elif pole_pair[i] == 1:
                 a[0, i] = -np.pi
-            elif pole_pair[i] == 2:
-                a[0, i] = 0
+                a[0, i+1] = 0
         a *= bound_wt
         A = np.vstack([A, a])
 
@@ -293,8 +283,8 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
     for i, pp in enumerate(pole_pair):
         if pp == 1:
             r1, r2 = rk[i:i+2]
-            rk[i] = r1 - 1j*r2
-            rk[i+1] = r1 + 1j*r2
+            rk[i] = r1 + 1j*r2
+            rk[i+1] = r1 - 1j*r2
     dk = x[n_pole] if col_d else None
     hk = x[n_pole+col_d] if col_h else None
     if reflect_z is not None:
