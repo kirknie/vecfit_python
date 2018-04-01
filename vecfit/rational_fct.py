@@ -266,6 +266,40 @@ class RationalMtx:
                 f[:, :, i] += si * self.linear
         return f
 
+    def is_symmetric(self):
+        if self.const is not None and not np.allclose(self.const, self.const.T):
+            return False
+        if self.linear is not None and not np.allclose(self.linear, self.linear.T):
+            return False
+        for i in range(np.size(self.residue, 2)):
+            mtx = self.residue[:, :, i]
+            if not np.allclose(mtx, mtx.T):
+                return False
+        return True
+
+    def rank_one(self):
+        if self.is_symmetric():
+            pole_pair = vector_fitting.pair_pole(self.pole)
+            new_residue = np.zeros([self.ndim, np.size(self.residue, 2)], dtype=self.residue.dtype)
+            for i, pp in enumerate(pole_pair):
+                s, u = takagi(self.residue[:, :, i])
+                if pp == 0:
+                    new_residue[:, i] = u[:, 0] * np.sqrt(s[0])
+                elif pp == 1:
+                    new_residue[:, i] = u[:, 0] * np.sqrt(s[0])
+                    new_residue[:, i+1] = (u[:, 0] * np.sqrt(s[0])).conj()
+            new_const = None
+            new_linear = None
+            if self.const is not None:
+                s, u = takagi(self.const)
+                new_const = u[:, 0] * np.sqrt(s[0])
+            if self.linear is not None:
+                s, u = takagi(self.linear)
+                new_linear = u[:, 0] * np.sqrt(s[0])
+            return RationalRankOneMtx(self.pole, new_residue, new_const, new_linear)
+        else:
+            raise RuntimeError('Asymmetric matrix is not supported yet!')
+
 
 def mat2vec(f_mat, symmetric=True):
     # Function to transform a symmetric matrix into a vector form
@@ -339,5 +373,82 @@ def vec2mat(f_vec, symmetric=True):
         f_mat = f_mat.reshape([ndim, ndim])
     return f_mat
 
+
+class RationalRankOneMtx:
+    def __init__(self, pole, residue, const=None, linear=None):
+        if residue.ndim == 2 and residue.shape[1] == len(pole):
+            self.ndim = residue.shape[0]
+            self.pole = np.array(pole)
+            self.residue = np.array(residue)
+            self.const = const
+            self.linear = linear
+        else:
+            raise RuntimeError('RationalRankOneMtx: Input format not expected')
+
+    def __add__(self, other):
+        p = np.concatenate([self.pole, other.pole])
+        r = np.concatenate([self.residue, other.residue], axis=1)
+        d = self.const
+        if other.const is not None:
+            if d is None:
+                d = other.const
+            else:
+                d += other.const
+        h = self.linear
+        if other.linear is not None:
+            if h is None:
+                h = other.linear
+            else:
+                h += other.linear
+        return RationalFct(p, r, d, h)
+
+    def __sub__(self, other):
+        p = np.concatenate([self.pole, other.pole])
+        r = np.concatenate([self.residue, -other.residue], axis=1)
+        d = self.const
+        if other.const is not None:
+            if d is None:
+                d = -other.const
+            else:
+                d -= other.const
+        h = self.linear
+        if other.linear is not None:
+            if h is None:
+                h = -other.linear
+            else:
+                h -= other.linear
+        return RationalFct(p, r, d, h)
+
+    def model(self, s):
+        s = np.array(s)
+        ns = len(s)
+        f = np.zeros([self.ndim, self.ndim, ns], dtype=np.complex128)
+        for i, si in enumerate(s):
+            f[:, :, i] = np.sum(np.outer(self.residue[:, j], self.residue[:, j]) / (si - p) for j, p in enumerate(self.pole))
+            if self.const is not None:
+                f[:, :, i] += np.outer(self.const, self.const)
+            if self.linear is not None:
+                f[:, :, i] += si * np.outer(self.linear, self.linear)
+        return f
+
+
+def takagi(a):
+    if a.ndim != 2 or a.shape[0] != a.shape[1]:
+        raise ValueError('The input matrix is not a square matrix!')
+    if not np.allclose(a, a.T):
+        raise ValueError('The input matrix is not symmetric!')
+    ndim = a.shape[0]
+    u, s, v = np.linalg.svd(a)
+    if not np.allclose(np.abs(u/v.T), np.ones([ndim, ndim])):
+        print('Warning: The Takagi factorization result may not be accurate!')
+
+    phase_diff = np.angle(u/v.T)[0, :]
+    rotation_mtx = np.diag(np.exp(-phase_diff/2*1j))
+    uu = u.dot(rotation_mtx)
+
+    # Should have a = uu * diag(s) * uu.T
+    if not np.allclose(a, uu.dot(np.diag(s)).dot(uu.T)):
+        print('Warning: The Takagi factorization result is not accurate! ')
+    return s, uu
 
 

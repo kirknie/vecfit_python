@@ -92,6 +92,7 @@ def example2():
 
     # f_out = vecfit.matrix_fitting(f_test, s_test, n_pole=18, n_iter=20, has_const=True, has_linear=True)
     f_out = vecfit.matrix_fitting_rescale(f_test, s_test, n_pole=18, n_iter=10, has_const=True, has_linear=True, fixed_pole=[-1000, -5+6000j, -5-6000j])
+    # f_out = f_out.rank_one()
     f_fit = f_out.model(s_test)
 
     fig = plt.figure()
@@ -222,6 +223,30 @@ def coupled_siw():
     plt.show()
 
 
+def coupled_siw_rank_one():
+    s2p_file = './resource/two_SIW_antenna_39GHz_50mil.s2p'
+    freq, n, z, s, z0 = vecfit.read_snp(s2p_file)
+    s_z0 = np.zeros(z.shape, dtype=z.dtype)
+    cs = freq * 2j * np.pi
+    # z0 = 50
+    z0 = 190
+    for i in range(len(freq)):
+        s_z0[:, :, i] = np.matrix(z[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i] / z0 + np.identity(n)))
+    cs_all = np.logspace(10, 12, 1e5) * 1j
+
+    f_out = vecfit.matrix_fitting_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
+    f_out = f_out.rank_one()
+    f_fit = f_out.model(cs)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plt.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_z0[0, 0, :])), 'b-')
+    plt.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[0, 0, :])), 'r--')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude (dB)')
+    plt.show()
+
+
 def dipole():
     s1p_file = './resource/single_dipole.s1p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
@@ -268,6 +293,7 @@ if __name__ == '__main__':
     # example2()
     # single_siw()
     # coupled_siw()
-    dipole()
+    coupled_siw_rank_one()
+    # dipole()
 
 
