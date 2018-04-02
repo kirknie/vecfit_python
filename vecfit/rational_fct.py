@@ -88,7 +88,7 @@ class RationalFct:
         else:
             raise RuntimeError('Do not have a constant term')
 
-    def bound(self, reflect, tau=0.2, f0=0):
+    def bound(self, reflect, tau=0.3162278, f0=0):
         bw = np.nan
         if reflect == 0:
             bound = -np.pi / 2 * (sum(1 / self.pole) + sum(1 / self.zero()))
@@ -103,7 +103,7 @@ class RationalFct:
             raise RuntimeError('Bound calculation unsupported yet!')
         return bound, bw
 
-    def bound_error(self, f, s, reflect, tau=0.2):
+    def bound_error(self, f, s, reflect, tau=0.3162278):
         f_fit = self.model(s)
         f_error = f_fit - f
         # Calculate rho first (single load)
