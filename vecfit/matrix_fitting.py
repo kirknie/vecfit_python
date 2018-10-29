@@ -72,8 +72,8 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole):
         if pole_pair[i] == 0:
             A1[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
-            A1[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-            A1[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
+            A1[:, i] = 1 / (s - p) + 1 / (s - p.conj())
+            A1[:, i+1] = 1j / (s - p) - 1j / (s - p.conj())
     if has_const:
         A1[:, n_pole] = 1
     if has_linear:
@@ -143,8 +143,8 @@ def final_step(f, s, fk, has_const, has_linear):
         if pole_pair[i] == 0:
             A1[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
-            A1[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-            A1[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
+            A1[:, i] = 1 / (s - p) + 1 / (s - p.conj())
+            A1[:, i+1] = 1j / (s - p) - 1j / (s - p.conj())
     if has_const:
         A1[:, n_pole] = 1
     if has_linear:

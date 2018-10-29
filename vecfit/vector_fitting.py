@@ -10,6 +10,12 @@ import numpy as np
 
 
 def init_pole(w, n_pole):
+    """
+    Generate the initial poles for vector fitting iterations
+    :param w: maximum radian frequency of the fitting function
+    :param n_pole: number of poles
+    :return: the initial poles
+    """
     loss_ratio = 1e-2
     n_pole = int(n_pole)
     
@@ -19,14 +25,14 @@ def init_pole(w, n_pole):
         pole = w * np.array([-loss_ratio-1j, -loss_ratio+1j])
     elif n_pole == 3:
         pole = w * np.array([loss_ratio, -loss_ratio-1j, -loss_ratio+1j])
-    elif n_pole > 3 and n_pole%2 == 0:
+    elif n_pole > 3 and n_pole % 2 == 0:
         complex_pole = np.linspace(0, 1, int((n_pole-2)/2+1))[1:]
-        pole = np.concatenate( [[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_pole] )
-        pole = w * np.concatenate( [[-1, -10], pole] )
-    elif n_pole > 3 and n_pole%2 == 1:
+        pole = np.concatenate([[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_pole])
+        pole = w * np.concatenate([[-1, -10], pole])
+    elif n_pole > 3 and n_pole % 2 == 1:
         complex_pole = np.linspace(0, 1, int((n_pole-3)/2+1))[1:]
-        pole = np.concatenate( [[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_pole] )
-        pole = w * np.concatenate( [[-1, -3, -10], pole] )
+        pole = np.concatenate([[p*(-loss_ratio-1j), p*(-loss_ratio+1j)] for p in complex_pole])
+        pole = w * np.concatenate([[-1, -3, -10], pole])
     else:
         raise RuntimeError('Error: invalid number of poles')
 
@@ -34,13 +40,17 @@ def init_pole(w, n_pole):
 
 
 def pair_pole(pole):
-    # Function groups pole into complex conjugate pairs
+    """
+    Function to group poles into complex conjugate pairs
+    :param pole: input poles, 1D array
+    :return: output array to indicate the pole pairs, 0 is single pole, 1/2 are pairs, 1D array
+    """
     pole_pair = np.zeros(len(pole))
     
     for i, p in enumerate(pole):
         if p.imag != 0:
             if i == 0 or pole_pair[i-1] != 1:
-                if p.conjugate() != pole[i+1]:
+                if p.conj() != pole[i+1]:
                     raise RuntimeError("Complex poles must come in conjugate pairs: %s, %s" % (p, pole[i+1]))
                 pole_pair[i] = 1
             else:
@@ -50,6 +60,13 @@ def pair_pole(pole):
 
 
 def calculate_zero(pole, residue, const):
+    """
+    Calculate the zeros of a partial fraction function: sum(residue/(s-pole)) + const
+    :param pole: poles, 1D array
+    :param residue: residues, 1D array
+    :param const: non-zero real constant, double
+    :return: zeros, 1D array
+    """
     # First group input poles into complex conjugate pairs
     n_pole = len(pole)
     pole_pair = pair_pole(pole)
@@ -142,8 +159,8 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
         if pole_pair[i] == 0:
             A[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
-            A[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-            A[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
+            A[:, i] = 1 / (s - p) + 1 / (s - p.conj())
+            A[:, i+1] = 1j / (s - p) - 1j / (s - p.conj())
         if i >= n_fixed:
             A[:, -n_pole + i] = -A[:, i] * f
     if has_const:
@@ -158,9 +175,9 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
                 A[:, i] += -(1 / (s0 - p) + 1 / (-s0 - p)) / 2
             elif pole_pair[i] == 1:
                 A[:, i] += -(1 / (s0 - p) + 1 / (-s0 - p)) / 2 - (
-                            1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
+                            1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
                 A[:, i+1] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
-                            1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
+                            1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
 
     # Form real equations from complex equations
     A = np.vstack([np.real(A), np.imag(A)])
@@ -234,8 +251,8 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
         if pole_pair[i] == 0:
             A[:, i] = 1 / (s - p)
         elif pole_pair[i] == 1:
-            A[:, i] = 1 / (s - p) + 1 / (s - p.conjugate())
-            A[:, i+1] = 1j / (s - p) - 1j / (s - p.conjugate())
+            A[:, i] = 1 / (s - p) + 1 / (s - p.conj())
+            A[:, i+1] = 1j / (s - p) - 1j / (s - p.conj())
     if has_const:
         A[:, n_pole] = 1
     if has_linear:
@@ -248,9 +265,9 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
                 A[:, i] += -(1 / (s0 - p) + 1 / (-s0 - p)) / 2
             elif pole_pair[i] == 1:
                 A[:, i] += -(1 / (s0 - p) + 1 / (-s0 - p)) / 2 - (
-                            1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
+                            1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
                 A[:, i+1] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
-                            1 / (s0 - p.conjugate()) + 1 / (-s0 - p.conjugate())) / 2
+                            1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
 
     # Form real equations from complex equations
     A = np.vstack([np.real(A), np.imag(A)])

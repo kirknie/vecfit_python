@@ -54,6 +54,11 @@ class RationalFct:
         return RationalFct(p, r, d, h)
 
     def model(self, s):
+        """
+        Return the function value at s
+        :param s: input argument, 1D array
+        :return: function value at s, 1D array
+        """
         s = np.array(s)
         f = sum(r/(s-p) for (p, r) in zip(self.pole, self.residue))
         if self.const is not None:
@@ -81,14 +86,26 @@ class RationalFct:
         fig.grid(True, which='both', linestyle='--')
         fig.set_xlabel('Frequency (Hz)')
         fig.set_ylabel('Amplitude (dB)')
+        return fig, ax
 
     def zero(self):
+        """
+        Calculate zeros of the function
+        :return: zeros, 1D array
+        """
         if self.const:
             return vector_fitting.calculate_zero(self.pole, self.residue, self.const)
         else:
             raise RuntimeError('Do not have a constant term')
 
     def bound(self, reflect, tau=0.3162278, f0=0):
+        """
+        Calculate the bound and maximum bandwidth of the S-parameter model
+        :param reflect: reflection point
+        :param tau: threshold for pass band, for bw calculation
+        :param f0: center frequency of pass band, for bw calculation
+        :return: the bound and maximum bandwidth
+        """
         bw = np.nan
         if reflect == 0:
             bound = -np.pi / 2 * (sum(1 / self.pole) + sum(1 / self.zero()))
@@ -104,6 +121,14 @@ class RationalFct:
         return bound, bw
 
     def bound_error(self, f, s, reflect, tau=0.3162278):
+        """
+        Calculate the bound error of the S-parameter model
+        :param f: the true S-parameter of load at s, 1D array
+        :param s: the input complex frequency
+        :param reflect: reflection point
+        :param tau: threshold for pass band
+        :return: the bound error
+        """
         f_fit = self.model(s)
         f_error = f_fit - f
         # Calculate rho first (single load)
@@ -114,6 +139,12 @@ class RationalFct:
         return delta_b
 
     def bound_integral(self, s, reflect):
+        """
+        Calculate the bound integral
+        :param s: complex frequency, 1D array
+        :param reflect: reflection point
+        :return: the integral value of the load, to be compared with the bound
+        """
         return bound_integral(self.model(s), s, reflect)
 
     def plot_improved_bound(self, real_limit, imag_limit, ax=None):
@@ -139,6 +170,12 @@ class RationalFct:
 
 
 def f_integral(w, reflect):
+    """
+    Generate the function inside of the bound integral
+    :param w: input radian frequency, 1D array
+    :param reflect: reflection point
+    :return: numerical value of the function at w
+    """
     if reflect == np.inf:
         f = np.ones(len(w))
     elif reflect.real > 0.0:
@@ -151,16 +188,32 @@ def f_integral(w, reflect):
 
 
 def num_integral(x, y):
+    """
+    Calculate the numerical integral value
+    :param x: x, 1D array
+    :param y: y, 1D array
+    :return: integral value
+    """
     return np.sum((y[:-1] + y[1:]) / 2 * (x[1:] - x[:-1]))
 
 
-def bound_integral(f, s, reflect):
-    return num_integral(s.imag, f_integral(s.imag, reflect) * np.log(1/np.abs(f)))
+def bound_integral(gamma, s, reflect):
+    """
+    Calculate the bound integral
+    :param gamma: power loss ratio, 1D array
+    :param s: complex frequency, 1D array
+    :param reflect: reflection point
+    :return: the integral value of the load, to be compared with the bound
+    """
+    return num_integral(s.imag, f_integral(s.imag, reflect) * np.log(1/np.abs(gamma)))
 
 
 def get_z0(snp_file):
-    # Input: file name
-    # Output: nxl z0
+    """
+    Get characteristic impedance Z0 from .snp file
+    :param snp_file: .snp file name, str
+    :return: Z0, nxl array
+    """
     n = int(snp_file[-2])
     if '.s' + str(n) + 'p' not in snp_file:
         raise RuntimeError('Error: input file is not snp touchstone file')
@@ -178,6 +231,12 @@ def get_z0(snp_file):
 
 
 def s2z(s, z0):
+    """
+    Convert S-matrix to Z-matrix
+    :param s: S-matrix, 1D array for n=1, nxnxl for nxn matrix
+    :param z0: characteristic impedance, double or 1D array for n=1, nxl array for nxn matrix
+    :return: Z-matrix, 1D array for n=1, nxnxl for nxn matrix
+    """
     if s.ndim == 1:  # one port
         z = z0 * (1+s) / (1-s)
     elif s.ndim == 3:
@@ -194,6 +253,11 @@ def s2z(s, z0):
 
 
 def read_snp(snp_file):
+    """
+    Read the .snp file for frequency, n, Z-matrix, S-matrix, and characteristic impedance
+    :param snp_file: .snp file name, str
+    :return: all parameters from .snp file
+    """
     ant_data = rf.Network(snp_file)
     z0 = get_z0(snp_file)
     n = ant_data.number_of_ports
@@ -302,6 +366,12 @@ class RationalMtx:
 
 
 def mat2vec(f_mat, symmetric=True):
+    """
+    Convert a matrix into the vector form
+    :param f_mat: nxnxl array
+    :param symmetric: whether the matrix is symmetric
+    :return: nx(n+1)/2-by-l array if symmetric, n^2-by-l if asymmetric
+    """
     # Function to transform a symmetric matrix into a vector form
     # Input: [ndim, ndim, ns]
     # Output: [ndim*(ndim+1)/2, ns]
@@ -336,6 +406,12 @@ def mat2vec(f_mat, symmetric=True):
 
 
 def vec2mat(f_vec, symmetric=True):
+    """
+    Convert a matrix from the vector form into the matrix form, inverse function of mat2vec
+    :param f_vec: nx(n+1)/2-by-l array if symmetric, n^2-by-l if asymmetric
+    :param symmetric: whether the matrix is symmetric
+    :return: nxnxl array
+    """
     # Function to transform a vector form into a symmetric matrix
     # Input: [ndim*(ndim+1)/2, ns]
     # Output: [ndim, ndim, ns]
