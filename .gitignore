@@ -1,0 +1,4 @@
+# ignore .pyc files and .idea/ files
+*.pyc
+.idea/*
+

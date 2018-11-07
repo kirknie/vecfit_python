@@ -352,15 +352,16 @@ class RationalMtx:
                 elif pp == 1:
                     new_residue[:, i] = u[:, 0] * np.sqrt(s[0])
                     new_residue[:, i+1] = (u[:, 0] * np.sqrt(s[0])).conj()
-            new_const = None
-            new_linear = None
-            if self.const is not None:
-                s, u = takagi(self.const)
-                new_const = u[:, 0] * np.sqrt(s[0])
-            if self.linear is not None:
-                s, u = takagi(self.linear)
-                new_linear = u[:, 0] * np.sqrt(s[0])
-            return RationalRankOneMtx(self.pole, new_residue, new_const, new_linear)
+            # new_const = None
+            # new_linear = None
+            # if self.const is not None:
+            #     s, u = takagi(self.const)
+            #     new_const = u[:, 0] * np.sqrt(s[0])
+            # if self.linear is not None:
+            #     s, u = takagi(self.linear)
+            #     new_linear = u[:, 0] * np.sqrt(s[0])
+            # return RationalRankOneMtx(self.pole, new_residue, new_const, new_linear)
+            return RationalRankOneMtx(self.pole, new_residue, self.const, self.linear)
         else:
             raise RuntimeError('Asymmetric matrix is not supported yet!')
 
@@ -455,9 +456,9 @@ class RationalRankOneMtx:
         if residue.ndim == 2 and residue.shape[1] == len(pole):
             self.ndim = residue.shape[0]
             self.pole = np.array(pole)
-            self.residue = np.array(residue)
-            self.const = const
-            self.linear = linear
+            self.residue = np.array(residue)  # residue is a list of vectors, not matrix
+            self.const = const  # const is a matrix, not necessarily rank 1
+            self.linear = linear  # linear is a matrix, not necessarily rank 1
         else:
             raise RuntimeError('RationalRankOneMtx: Input format not expected')
 
@@ -502,10 +503,19 @@ class RationalRankOneMtx:
         for i, si in enumerate(s):
             f[:, :, i] = np.sum(np.outer(self.residue[:, j], self.residue[:, j]) / (si - p) for j, p in enumerate(self.pole))
             if self.const is not None:
-                f[:, :, i] += np.outer(self.const, self.const)
+                # f[:, :, i] += np.outer(self.const, self.const)
+                f[:, :, i] += self.const
             if self.linear is not None:
-                f[:, :, i] += si * np.outer(self.linear, self.linear)
+                # f[:, :, i] += si * np.outer(self.linear, self.linear)
+                f[:, :, i] += si * self.linear
         return f
+
+    def full_rank(self):
+        pole_pair = vector_fitting.pair_pole(self.pole)
+        new_residue = np.zeros([self.ndim, self.ndim, np.size(self.residue, 1)], dtype=self.residue.dtype)
+        for i, pp in enumerate(pole_pair):
+            new_residue[:, :, i] = np.outer(self.residue[:, i], self.residue[:, i])
+        return RationalRankOneMtx(self.pole, new_residue, self.const, self.linear)
 
 
 def takagi(a):
