@@ -376,6 +376,9 @@ def mat2vec(f_mat, symmetric=True):
     # Function to transform a symmetric matrix into a vector form
     # Input: [ndim, ndim, ns]
     # Output: [ndim*(ndim+1)/2, ns]
+    if f_mat is None:
+        return None
+
     dim_one = False
     if f_mat.ndim == 2:
         dim_one = True
@@ -416,6 +419,9 @@ def vec2mat(f_vec, symmetric=True):
     # Function to transform a vector form into a symmetric matrix
     # Input: [ndim*(ndim+1)/2, ns]
     # Output: [ndim, ndim, ns]
+    if f_vec is None:
+        return None
+
     dim_one = False
     if f_vec.ndim == 1:
         dim_one = True

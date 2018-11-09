@@ -18,8 +18,10 @@ def init_pole(w, n_pole):
     """
     loss_ratio = 1e-2
     n_pole = int(n_pole)
-    
-    if n_pole == 1:
+
+    if n_pole == 0:
+        pole = np.array([])
+    elif n_pole == 1:
         pole = np.array(-loss_ratio*w)
     elif n_pole == 2:
         pole = w * np.array([-loss_ratio-1j, -loss_ratio+1j])
@@ -99,9 +101,9 @@ def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, 
         raise RuntimeError('reflect_z is set but has_const is False.  Setting it has_const = True!')
 
     w = np.imag(s)
-    if fixed_pole:
+    if fixed_pole is not None:
         n_fixed = len(fixed_pole)
-        if n_fixed >= n_pole:
+        if n_fixed > n_pole:
             raise RuntimeError('Too many fixed poles!')
         p = np.concatenate([fixed_pole, init_pole(w[-1], n_pole - n_fixed)])
     else:
@@ -140,7 +142,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
     n_pole = len(fk.pole)
     n_freq = len(s)
     n_fixed = 0
-    if fixed_pole:
+    if fixed_pole is not None:
         n_fixed = len(fixed_pole)
         fk.pole[:n_fixed] = fixed_pole  # should not need this, fixed poles already in there
     pole_pair = pair_pole(fk.pole)
@@ -209,7 +211,10 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
 
     rk = np.complex128(x[:n_pole])
-    qk = np.complex128(x[-n_pole+n_fixed:])
+    if n_fixed == n_pole:
+        qk = np.array([])
+    else:
+        qk = np.complex128(x[-n_pole + n_fixed:])
     for i, pp in enumerate(pole_pair):
         if pp == 1:
             r1, r2 = rk[i:i+2]
@@ -222,7 +227,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
     dk = x[n_pole] if col_d else None
     hk = x[n_pole+col_d] if col_h else None
     pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
-    if fixed_pole:
+    if fixed_pole is not None:
         pk = np.concatenate([fixed_pole, pk])
     unstable = np.real(pk) > 0
     pk[unstable] -= 2*np.real(pk)[unstable]

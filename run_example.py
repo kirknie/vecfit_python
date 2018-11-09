@@ -235,6 +235,7 @@ def coupled_siw_rank_one():
     cs_all = np.logspace(10, 12, 1e5) * 1j
 
     f_out = vecfit.matrix_fitting_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
+    # f_out = vecfit.matrix_fitting_rank_one(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
     f_out = f_out.rank_one()
     f_fit = f_out.model(cs)
 
@@ -288,12 +289,47 @@ def dipole():
     plt.show()
 
 
+def coupled_dipole():
+    s2p_file = './resource/coupled_dipoles.s2p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s2p_file)
+    # z0 = 50
+    # s_data = (z_data-z0) / (z_data+z0)
+    cs = freq*2j*np.pi
+
+    # Fit even and odd mode separately
+    s_even = ((s_data[0, 0, :] + s_data[0, 1, :] + s_data[1, 0, :] + s_data[1, 1, :]) / 2).reshape(len(freq))
+    s_odd = ((s_data[0, 0, :] - s_data[0, 1, :] - s_data[1, 0, :] + s_data[1, 1, :]) / 2).reshape(len(freq))
+    # Even and odd mode
+    f_even = vecfit.fit_s(s_even, cs, n_pole=3, n_iter=20, s_inf=1)
+    f_odd = vecfit.fit_s(s_odd, cs, n_pole=3, n_iter=20, s_inf=1)
+
+    # Try to fit S
+    fixed_pole = np.concatenate([f_even.pole, f_odd.pole])
+    f_out = vecfit.matrix_fitting_rescale(s_data, cs, n_pole=6, n_iter=20, has_const=True, has_linear=False, fixed_pole=fixed_pole)
+    f_out = f_out.rank_one()
+    f_fit = f_out.model(cs)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(211)
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_data[0, 0, :])), 'b-')
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[0, 0, :])), 'r--')
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('S11 Amplitude (dB)')
+    ax = fig.add_subplot(212)
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_data[1, 0, :])), 'b-')
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[1, 0, :])), 'r--')
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('S21 Amplitude (dB)')
+    plt.show()
+
+
 if __name__ == '__main__':
     # example1()
     # example2()
     # single_siw()
     # coupled_siw()
-    coupled_siw_rank_one()
+    # coupled_siw_rank_one()
     # dipole()
+    coupled_dipole()
 
 
