@@ -188,10 +188,30 @@ def final_step(f, s, fk, has_const, has_linear):
 def matrix_fitting_rank_one(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None):
     fk = matrix_fitting(f, s, n_pole, n_iter, has_const, has_linear, fixed_pole)
     fk = fk.rank_one()
-    for k in range(1):
+    for k in range(n_iter):
         fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole)
 
     return fk
+
+
+def matrix_fitting_rank_one_rescale(f, s, *args, **kwargs):
+    s_scale = abs(s[-1])
+    f_scale = abs(f[0, 0, -1])
+
+    if 'fixed_pole' in kwargs and kwargs['fixed_pole'] is not None:
+        kwargs['fixed_pole'] = [p/s_scale for p in kwargs['fixed_pole']]
+    if 'reflect_z' in kwargs and kwargs['reflect_z'] is not None:
+        kwargs['reflect_z'] /= s_scale
+
+    f_model = matrix_fitting_rank_one(f/f_scale, s/s_scale, *args, **kwargs)
+    f_model.pole *= s_scale
+    f_model.residue *= f_scale * s_scale
+    if f_model.const is not None:
+        f_model.const *= f_scale
+    if f_model.linear is not None:
+        f_model.linear *= f_scale / s_scale
+
+    return f_model
 
 
 def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole):
@@ -201,7 +221,7 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole):
     f_vec = mat2vec(f)
     n_vec = np.size(f_vec, 0)
     n_fixed = 0
-    if fixed_pole:
+    if fixed_pole is not None:
         n_fixed = len(fixed_pole)
         fk.pole[:n_fixed] = fixed_pole  # should not need this, fixed poles already in there
     pole_pair = pair_pole(fk.pole)
@@ -317,7 +337,7 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole):
     # if hk is not None and not real_linear:
     #     hk = 1j * hk
     pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
-    if fixed_pole:
+    if fixed_pole is not None:
         pk = np.concatenate([fixed_pole, pk])
     unstable = np.real(pk) > 0
     pk[unstable] -= 2*np.real(pk)[unstable]
