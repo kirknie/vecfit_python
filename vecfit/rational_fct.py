@@ -342,28 +342,21 @@ class RationalMtx:
         return True
 
     def rank_one(self):
-        if self.is_symmetric():
-            pole_pair = vector_fitting.pair_pole(self.pole)
-            new_residue = np.zeros([self.ndim, np.size(self.residue, 2)], dtype=self.residue.dtype)
-            for i, pp in enumerate(pole_pair):
-                s, u = takagi(self.residue[:, :, i])
-                if pp == 0:
-                    new_residue[:, i] = u[:, 0] * np.sqrt(s[0])
-                elif pp == 1:
-                    new_residue[:, i] = u[:, 0] * np.sqrt(s[0])
-                    new_residue[:, i+1] = (u[:, 0] * np.sqrt(s[0])).conj()
-            # new_const = None
-            # new_linear = None
-            # if self.const is not None:
-            #     s, u = takagi(self.const)
-            #     new_const = u[:, 0] * np.sqrt(s[0])
-            # if self.linear is not None:
-            #     s, u = takagi(self.linear)
-            #     new_linear = u[:, 0] * np.sqrt(s[0])
-            # return RationalRankOneMtx(self.pole, new_residue, new_const, new_linear)
-            return RationalRankOneMtx(self.pole, new_residue, self.const, self.linear)
-        else:
-            raise RuntimeError('Asymmetric matrix is not supported yet!')
+        pole_pair = vector_fitting.pair_pole(self.pole)
+        new_residue_left = np.zeros([self.ndim, np.size(self.residue, 2)], dtype=self.residue.dtype)
+        new_residue_right = np.zeros([self.ndim, np.size(self.residue, 2)], dtype=self.residue.dtype)
+        for i, pp in enumerate(pole_pair):
+            # s, u = takagi(self.residue[:, :, i])
+            u, s, v = np.linalg.svd(self.residue[:, :, i])
+            if pp == 0:
+                new_residue_left[:, i] = u[:, 0] * np.sqrt(s[0])
+                new_residue_right[:, i] = v[0, :] * np.sqrt(s[0])
+            elif pp == 1:
+                new_residue_left[:, i] = u[:, 0] * np.sqrt(s[0])
+                new_residue_right[:, i] = v[0, :] * np.sqrt(s[0])
+                new_residue_left[:, i + 1] = u[:, 0].conj() * np.sqrt(s[0])
+                new_residue_right[:, i + 1] = v[0, :].conj() * np.sqrt(s[0])
+        return RationalRankOneMtx(self.pole, new_residue_left, new_residue_right, self.const, self.linear)
 
 
 def mat2vec(f_mat, symmetric=True):
@@ -458,11 +451,12 @@ def vec2mat(f_vec, symmetric=True):
 
 
 class RationalRankOneMtx:
-    def __init__(self, pole, residue, const=None, linear=None):
-        if residue.ndim == 2 and residue.shape[1] == len(pole):
-            self.ndim = residue.shape[0]
+    def __init__(self, pole, residue_left, residue_right, const=None, linear=None):
+        if residue_left.shape == residue_right.shape and residue_left.ndim == 2 and residue_left.shape[1] == len(pole):
+            self.ndim = residue_left.shape[0]
             self.pole = np.array(pole)
-            self.residue = np.array(residue)  # residue is a list of vectors, not matrix
+            self.residue_left = np.array(residue_left)  # residue is a list of left vectors, not matrix
+            self.residue_right = np.array(residue_right)  # residue is a list of right vectors, not matrix
             self.const = const  # const is a matrix, not necessarily rank 1
             self.linear = linear  # linear is a matrix, not necessarily rank 1
         else:
@@ -470,7 +464,8 @@ class RationalRankOneMtx:
 
     def __add__(self, other):
         p = np.concatenate([self.pole, other.pole])
-        r = np.concatenate([self.residue, other.residue], axis=1)
+        rl = np.concatenate([self.residue_left, other.residue_left], axis=1)
+        rr = np.concatenate([self.residue_right, other.residue_right], axis=1)
         d = self.const
         if other.const is not None:
             if d is None:
@@ -483,11 +478,12 @@ class RationalRankOneMtx:
                 h = other.linear
             else:
                 h += other.linear
-        return RationalFct(p, r, d, h)
+        return RationalFct(p, rl, rr, d, h)
 
     def __sub__(self, other):
         p = np.concatenate([self.pole, other.pole])
-        r = np.concatenate([self.residue, -other.residue], axis=1)
+        rl = np.concatenate([self.residue_left, -other.residue_left], axis=1)
+        rr = np.concatenate([self.residue_right, other.residue_right], axis=1)
         d = self.const
         if other.const is not None:
             if d is None:
@@ -500,14 +496,14 @@ class RationalRankOneMtx:
                 h = -other.linear
             else:
                 h -= other.linear
-        return RationalFct(p, r, d, h)
+        return RationalFct(p, rl, rr, d, h)
 
     def model(self, s):
         s = np.array(s)
         ns = len(s)
         f = np.zeros([self.ndim, self.ndim, ns], dtype=np.complex128)
         for i, si in enumerate(s):
-            f[:, :, i] = np.sum(np.outer(self.residue[:, j], self.residue[:, j]) / (si - p) for j, p in enumerate(self.pole))
+            f[:, :, i] = np.sum(np.outer(self.residue_left[:, j], self.residue_right[:, j]) / (si - p) for j, p in enumerate(self.pole))
             if self.const is not None:
                 # f[:, :, i] += np.outer(self.const, self.const)
                 f[:, :, i] += self.const
@@ -518,10 +514,10 @@ class RationalRankOneMtx:
 
     def full_rank(self):
         pole_pair = vector_fitting.pair_pole(self.pole)
-        new_residue = np.zeros([self.ndim, self.ndim, np.size(self.residue, 1)], dtype=self.residue.dtype)
+        new_residue = np.zeros([self.ndim, self.ndim, np.size(self.residue_left, 1)], dtype=self.residue_left.dtype)
         for i, pp in enumerate(pole_pair):
-            new_residue[:, :, i] = np.outer(self.residue[:, i], self.residue[:, i])
-        return RationalRankOneMtx(self.pole, new_residue, self.const, self.linear)
+            new_residue[:, :, i] = np.outer(self.residue_left[:, i], self.residue_right[:, i])
+        return RationalMtx(self.pole, new_residue, self.const, self.linear)
 
 
 def takagi(a):

@@ -189,7 +189,8 @@ def matrix_fitting_rank_one(f, s, n_pole=10, n_iter=10, has_const=True, has_line
     fk = matrix_fitting(f, s, n_pole, n_iter, has_const, has_linear, fixed_pole)
     fk = fk.rank_one()
     for k in range(n_iter):
-        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole)
+        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole, update='left')
+        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole, update='right')
 
     return fk
 
@@ -205,7 +206,8 @@ def matrix_fitting_rank_one_rescale(f, s, *args, **kwargs):
 
     f_model = matrix_fitting_rank_one(f/f_scale, s/s_scale, *args, **kwargs)
     f_model.pole *= s_scale
-    f_model.residue *= f_scale * s_scale
+    f_model.residue_left *= np.sqrt(f_scale * s_scale)
+    f_model.residue_right *= np.sqrt(f_scale * s_scale)
     if f_model.const is not None:
         f_model.const *= f_scale
     if f_model.linear is not None:
@@ -214,7 +216,125 @@ def matrix_fitting_rank_one_rescale(f, s, *args, **kwargs):
     return f_model
 
 
-def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole):
+def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
+    if update != 'left' and update != 'right':
+        raise RuntimeError('The update must be set to left/right!')
+
+    n_pole = len(fk.pole)
+    n_freq = len(s)
+    n_mat = np.size(f, 0)
+    f_vec = mat2vec(f, False)  # non-symmetric matrix
+    n_vec = np.size(f_vec, 0)
+    n_fixed = 0
+    if fixed_pole is not None:
+        n_fixed = len(fixed_pole)
+        fk.pole[:n_fixed] = fixed_pole  # should not need this, fixed poles already in there
+    pole_pair = pair_pole(fk.pole)
+
+    # Construct the set of linear equations A*x=b
+    # x = [r_i, d, h, q_i]
+    col_d = 1 if has_const else 0
+    col_h = 1 if has_linear else 0
+
+    # Construct A
+    # rows: element 00 all freq, element 01 all freq, ...
+    # cols: element 0 of all poles, element 1 of all poles, const 00, const 01, ..., linear 00, linear 01, ...
+    A = np.zeros((n_freq * n_vec, n_pole * n_mat + (col_d + col_h) * n_vec + n_pole - n_fixed), dtype=np.complex128)
+    # A1 = np.zeros((n_freq, n_pole + col_d + col_h), dtype=A.dtype)  # for r, d, h, not q
+
+    idx = 0
+    for i in range(n_mat):
+        for j in range(n_mat):
+            # Fill in the corresponding rows of A, constraints on S_ij
+            row_range = range(idx*n_freq, (idx+1)*n_freq)
+            for k, p in enumerate(fk.pole):
+                if pole_pair[k] == 0:
+                    if update == 'left':
+                        A[row_range, i * n_pole + k] = fk.residue_right[j, k] / (s - p)
+                    else:
+                        A[row_range, j * n_pole + k] = fk.residue_left[i, k] / (s - p)
+                if pole_pair[k] == 1:
+                    if update == 'left':
+                        A[row_range, i * n_pole + k] = fk.residue_right[j, k] / (s - p) + fk.residue_right[j, k].conj() / (s - p.conj())
+                        A[row_range, i * n_pole + k + 1] = 1j * fk.residue_right[j, k] / (s - p) - 1j * fk.residue_right[j, k].conj() / (s - p.conj())
+                    else:
+                        A[row_range, j * n_pole + k + 1] = fk.residue_left[i, k] / (s - p) + fk.residue_left[i, k].conj() / (s - p.conj())
+                        A[row_range, j * n_pole + k + 1] = 1j * fk.residue_left[i, k] / (s - p) - 1j * fk.residue_left[i, k].conj() / (s - p.conj())
+            if has_const:
+                A[row_range, n_pole * n_mat + idx] = 1
+            if has_linear:
+                A[row_range, n_pole * n_mat + col_d * n_vec + idx] = s
+            idx += 1
+
+    for i in range(n_vec):
+        row_range = range(i*n_freq, (i+1)*n_freq)
+        for j in range(n_fixed, n_pole):
+            p = fk.pole[j]
+            if pole_pair[j] == 0:
+                A[row_range, -n_pole+j] = -f_vec[i, :] / (s - p)
+            elif pole_pair[j] == 1:
+                A[row_range, -n_pole+j] = -f_vec[i, :] / (s - p) - f_vec[i, :] / (s - p.conj())
+                A[row_range, -n_pole+j+1] = -1j * f_vec[i, :] / (s - p) - 1j * f_vec[i, :] / (s - p.conj())
+
+    # Form real equations from complex equations
+    A = np.vstack([np.real(A), np.imag(A)])
+
+    cA = np.linalg.cond(A)
+    if cA > 1e13:
+        print('Warning: Ill Conditioned Matrix.  Cond(A)={:.2e}  Consider scaling the problem down'.format(cA))
+
+    # Construct b
+    # b: element 00 all freq, element 01 all freq, ...
+    b = f_vec.reshape(n_freq * n_vec)  # order in rows (nF)
+    b = np.concatenate([np.real(b), np.imag(b)])
+
+    # Solve for x
+    x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
+
+    # x: element 0 of all poles, element 1 of all poles, const 00, const 01, ..., linear 00, linear 01, ...
+    rk = np.zeros([n_mat, n_pole], dtype=np.complex128)
+    for i in range(n_mat):
+        rk[i, :] = x[n_pole*i:n_pole*(i+1)]
+    if n_fixed == n_pole:
+        qk = np.array([])
+    else:
+        qk = np.complex128(x[-n_pole + n_fixed:])
+    for i, pp in enumerate(pole_pair):
+        if pp == 1:
+            r1 = np.copy(rk[:, i])
+            r2 = np.copy(rk[:, i+1])
+            rk[:, i] = r1 + 1j*r2
+            rk[:, i+1] = r1 - 1j*r2
+            if i >= n_fixed:
+                q1, q2 = qk[i-n_fixed:i-n_fixed+2]
+                qk[i-n_fixed] = q1 + 1j * q2
+                qk[i-n_fixed + 1] = q1 - 1j * q2
+        # elif pp == 0 and not real_residue[i]:
+        #     rk[:, i] *= 1j
+    if col_d is None:
+        dk = None
+    else:
+        dk = x[n_pole * n_mat:n_pole * n_mat + n_vec]
+        dk = vec2mat(dk, False)
+    if col_h is None:
+        hk = None
+    else:
+        hk = x[n_pole * n_mat + n_vec * col_d:n_pole * n_mat + n_vec * col_d + n_vec]
+        hk = vec2mat(hk, False)
+    pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
+    if fixed_pole is not None:
+        pk = np.concatenate([fixed_pole, pk])
+    unstable = np.real(pk) > 0
+    pk[unstable] -= 2*np.real(pk)[unstable]
+
+    # Convert the vector back to matrix
+    if update == 'left':
+        return RationalRankOneMtx(pk, rk, fk.residue_right, dk, hk)
+    else:
+        return RationalRankOneMtx(pk, fk.residue_left, rk, dk, hk)
+
+
+def iteration_symmetric_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
     n_pole = len(fk.pole)
     n_freq = len(s)
     n_mat = np.size(f, 0)
@@ -237,14 +357,6 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole):
             real_residue.append(True)
         else:
             real_residue.append(False)
-    # if has_const and np.all(np.abs(fk.const.imag) < 1e-8 * np.abs(fk.const.real)):
-    #     real_const = True
-    # else:
-    #     real_const = False
-    # if has_linear and np.all(np.abs(fk.linear.imag) < 1e-8 * np.abs(fk.linear.real)):
-    #     real_linear = True
-    # else:
-    #     real_linear = False
 
     # Construct A
     # rows: element 00 all freq, element 01 all freq, ...
