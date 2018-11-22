@@ -173,16 +173,16 @@ def single_siw():
 def coupled_siw():
     s2p_file = './resource/two_SIW_antenna_39GHz_50mil.s2p'
     freq, n, z, s, z0 = vecfit.read_snp(s2p_file)
-    s_50 = np.zeros(z.shape, dtype=z.dtype)
+    s_z0 = np.zeros(z.shape, dtype=z.dtype)
     cs = freq * 2j * np.pi
     # z0 = 50
     z0 = 190
     for i in range(len(freq)):
-        s_50[:, :, i] = np.matrix(z[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i] / z0 + np.identity(n)))
+        s_z0[:, :, i] = np.matrix(z[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i] / z0 + np.identity(n)))
 
     # Fit even and odd mode separately
-    s_even = ((s_50[0, 0, :] + s_50[0, 1, :] + s_50[1, 0, :] + s_50[1, 1, :]) / 2).reshape(len(freq))
-    s_odd = ((s_50[0, 0, :] - s_50[0, 1, :] - s_50[1, 0, :] + s_50[1, 1, :]) / 2).reshape(len(freq))
+    s_even = ((s_z0[0, 0, :] + s_z0[0, 1, :] + s_z0[1, 0, :] + s_z0[1, 1, :]) / 2).reshape(len(freq))
+    s_odd = ((s_z0[0, 0, :] - s_z0[0, 1, :] - s_z0[1, 0, :] + s_z0[1, 1, :]) / 2).reshape(len(freq))
     cs_all = np.logspace(10, 12, 1e5) * 1j
 
     # Even mode
@@ -249,10 +249,17 @@ def coupled_siw_rank_one():
     for i in range(len(freq)):
         s_z0[:, :, i] = np.matrix(z[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i] / z0 + np.identity(n)))
     cs_all = np.logspace(10, 12, 1e5) * 1j
+    
+    # try the poles of even and odd mode
+    s_even = ((s_z0[0, 0, :] + s_z0[0, 1, :] + s_z0[1, 0, :] + s_z0[1, 1, :]) / 2).reshape(len(freq))
+    s_odd = ((s_z0[0, 0, :] - s_z0[0, 1, :] - s_z0[1, 0, :] + s_z0[1, 1, :]) / 2).reshape(len(freq))
+    f_even = vecfit.fit_s(s_even, cs, n_pole=19, n_iter=20, s_inf=1, bound_wt=1.1)
+    f_odd = vecfit.fit_s(s_odd, cs, n_pole=17, n_iter=20, s_inf=1, bound_wt=0.62)
+    poles = np.concatenate([f_even.pole, f_odd.pole])
 
     # f_out = vecfit.matrix_fitting_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
     # f_out = f_out.rank_one()
-    f_out = vecfit.matrix_fitting_rank_one_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
+    f_out = vecfit.matrix_fitting_rank_one_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True, fixed_pole=poles)
     f_fit = f_out.model(cs)
 
     plot_matrix(np.abs(cs)/2/np.pi, s_z0, f_fit)
