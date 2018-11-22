@@ -10,6 +10,22 @@ import matplotlib.pyplot as plt
 import vecfit
 
 
+def plot_matrix(x, y, y2=None):
+    fig = plt.figure()
+    ndim = np.size(y, 0)
+    idx = 1
+    for i in range(ndim):
+        for j in range(ndim):
+            plot_idx = ndim * 100 + ndim * 10 + idx
+            ax = fig.add_subplot(plot_idx)
+            ax.plot(x, 20 * np.log10(np.abs(y[i, j, :])), 'b-')
+            if y2 is not None:
+                ax.plot(x, 20 * np.log10(np.abs(y2[i, j, :])), 'r--')
+            ax.set_xlabel('Frequency (Hz)')
+            ax.set_ylabel('S{}{} Amplitude (dB)'.format(i+1, j+1))
+            idx += 1
+
+
 def example1():
     s_test = 1j * np.linspace(1, 1e5, 800)
     poles_test = [-4500,
@@ -234,17 +250,12 @@ def coupled_siw_rank_one():
         s_z0[:, :, i] = np.matrix(z[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i] / z0 + np.identity(n)))
     cs_all = np.logspace(10, 12, 1e5) * 1j
 
-    f_out = vecfit.matrix_fitting_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
-    # f_out = vecfit.matrix_fitting_rank_one(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
-    f_out = f_out.rank_one()
+    # f_out = vecfit.matrix_fitting_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
+    # f_out = f_out.rank_one()
+    f_out = vecfit.matrix_fitting_rank_one_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
     f_fit = f_out.model(cs)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plt.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_z0[0, 0, :])), 'b-')
-    plt.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[0, 0, :])), 'r--')
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Amplitude (dB)')
+    plot_matrix(np.abs(cs)/2/np.pi, s_z0, f_fit)
     plt.show()
 
 
@@ -323,27 +334,7 @@ def coupled_dipole():
     f_out = vecfit.matrix_fitting_rank_one_rescale(s_data, cs, n_pole=6, n_iter=50, has_const=True, has_linear=True, fixed_pole=fixed_pole)
     f_fit = f_out.model(cs)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(221)
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_data[0, 0, :])), 'b-')
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[0, 0, :])), 'r--')
-    ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('S11 Amplitude (dB)')
-    ax = fig.add_subplot(222)
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_data[0, 1, :])), 'b-')
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[0, 1, :])), 'r--')
-    ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('S12 Amplitude (dB)')
-    ax = fig.add_subplot(223)
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_data[1, 0, :])), 'b-')
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[1, 0, :])), 'r--')
-    ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('S21 Amplitude (dB)')
-    ax = fig.add_subplot(224)
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_data[1, 1, :])), 'b-')
-    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_fit[1, 1, :])), 'r--')
-    ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('S22 Amplitude (dB)')
+    plot_matrix(np.abs(cs)/2/np.pi, s_data, f_fit)
     plt.show()
 
 
@@ -352,8 +343,8 @@ if __name__ == '__main__':
     # example2()
     # single_siw()
     # coupled_siw()
-    # coupled_siw_rank_one()
+    coupled_siw_rank_one()
     # dipole()
-    coupled_dipole()
+    # coupled_dipole()
 
 

@@ -7,7 +7,7 @@ Created on Sun Oct  1 16:14:44 2017
 
 import numpy as np
 from .rational_fct import RationalMtx, RationalRankOneMtx, vec2mat, mat2vec
-from .vector_fitting import pair_pole, init_pole, calculate_zero
+from .vector_fitting import pair_pole, init_pole, calculate_zero, lstsq
 
 
 def matrix_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None):
@@ -189,8 +189,8 @@ def matrix_fitting_rank_one(f, s, n_pole=10, n_iter=10, has_const=True, has_line
     fk = matrix_fitting(f, s, n_pole, n_iter, has_const, has_linear, fixed_pole)
     fk = fk.rank_one()
     for k in range(n_iter):
-        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole, update='left')
-        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole, update='right')
+        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update='left')
+        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update='right')
 
     return fk
 
@@ -258,7 +258,7 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
                         A[row_range, i * n_pole + k] = fk.residue_right[j, k] / (s - p) + fk.residue_right[j, k].conj() / (s - p.conj())
                         A[row_range, i * n_pole + k + 1] = 1j * fk.residue_right[j, k] / (s - p) - 1j * fk.residue_right[j, k].conj() / (s - p.conj())
                     else:
-                        A[row_range, j * n_pole + k + 1] = fk.residue_left[i, k] / (s - p) + fk.residue_left[i, k].conj() / (s - p.conj())
+                        A[row_range, j * n_pole + k] = fk.residue_left[i, k] / (s - p) + fk.residue_left[i, k].conj() / (s - p.conj())
                         A[row_range, j * n_pole + k + 1] = 1j * fk.residue_left[i, k] / (s - p) - 1j * fk.residue_left[i, k].conj() / (s - p.conj())
             if has_const:
                 A[row_range, n_pole * n_mat + idx] = 1

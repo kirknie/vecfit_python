@@ -61,6 +61,28 @@ def pair_pole(pole):
     return pole_pair
 
 
+def lstsq(A, b, rcond=-1):
+    """
+    Linear lease square method, remove all zero columns in A first and then call np.linalg.lstsq
+    :param A: MxN matrix A
+    :param b: Mx1 vector b
+    :param rcond: condition number to be treated as zero
+    :return: Nx1 vector x, residuals, rank, singular
+    """
+    # find columns of A that are not all zero
+    non_zero = np.any(A != 0, 0)
+
+    # construct new matrix A1
+    A1 = A[:, non_zero]
+    x1, residuals, rank, singular = np.linalg.lstsq(A1, b, rcond=rcond)
+
+    # construct solution x using x1
+    x = np.zeros(np.size(A, 1))
+    x[non_zero] = x1
+
+    return x, residuals, rank, singular
+
+
 def calculate_zero(pole, residue, const):
     """
     Calculate the zeros of a partial fraction function: sum(residue/(s-pole)) + const
