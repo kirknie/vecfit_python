@@ -338,7 +338,7 @@ def coupled_dipole():
     fixed_pole = np.concatenate([f_even.pole, f_odd.pole])
     # f_out = vecfit.matrix_fitting_rescale(s_data, cs, n_pole=6, n_iter=20, has_const=True, has_linear=False, fixed_pole=fixed_pole)
     # f_out = f_out.rank_one()
-    f_out = vecfit.matrix_fitting_rank_one_rescale(s_data, cs, n_pole=6, n_iter=50, has_const=True, has_linear=True, fixed_pole=fixed_pole)
+    f_out = vecfit.matrix_fitting_rank_one_rescale(s_data, cs, n_pole=6, n_iter=50, has_const=True, has_linear=True)
     f_fit = f_out.model(cs)
 
     plot_matrix(np.abs(cs)/2/np.pi, s_data, f_fit)
