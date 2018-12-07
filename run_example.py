@@ -350,8 +350,8 @@ if __name__ == '__main__':
     # example2()
     # single_siw()
     # coupled_siw()
-    coupled_siw_rank_one()
+    # coupled_siw_rank_one()
     # dipole()
-    # coupled_dipole()
+    coupled_dipole()
 
 

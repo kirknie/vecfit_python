@@ -8,6 +8,7 @@ Created on Sun Oct  1 16:14:44 2017
 import numpy as np
 from .rational_fct import RationalMtx, RationalRankOneMtx, vec2mat, mat2vec
 from .vector_fitting import pair_pole, init_pole, calculate_zero, lstsq
+from .gradient_descent import gradient_descent
 
 
 def matrix_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None):
@@ -191,9 +192,245 @@ def matrix_fitting_rank_one(f, s, n_pole=10, n_iter=10, has_const=True, has_line
     for k in range(n_iter):
         fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update='left')
         fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update='right')
-    fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole, update='pole')
+    # fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole, update='pole')
+    
+    # # gradient descent on poles
+    # # x = [real pole, complex pole real part, complex pole imag part]
+    # pole_pair = pair_pole(fk.pole)
+    # x0 = np.zeros(fk.pole.shape)
+    # for i, pp in enumerate(pole_pair):
+    #     if pp == 0:
+    #         x0[i] = fk.pole[i].real  # no imag part
+    #     elif pp == 1:
+    #         x0[i] = fk.pole[i].real
+    #         x0[i+1] = fk.pole[i].imag
+    # y = lambda x: matrix_cost_fct(x, fk, f, s)
+    # dy = lambda x: d_matrix_cost_fct(x, fk, f, s)
+    # x, x_list = gradient_descent(y, dy, x0, return_step=True)
+    #
+    # pole = np.zeros(fk.pole.shape, dtype=np.complex128)
+    # for i, pp in enumerate(pole_pair):
+    #     if pp == 0:
+    #         pole[i] = x[i]
+    #     elif pp == 1:
+    #         pole[i] = x[i] + 1j*x[i+1]
+    #         pole[i+1] = x[i] - 1j*x[i+1]
+    # fk.pole = pole
 
     return fk
+
+
+def matrix_cost_fct(x, model, f, s):
+    pole_pair = pair_pole(model.pole)
+    y = 0
+    for i1 in range(np.size(f, 0)):
+        for i2 in range(np.size(f, 1)):
+            d = model.const[i1, i2].real
+            h = model.linear[i1, i2].real
+            for i3 in range(np.size(f, 2)):
+                w = s[i3].imag
+                ele = f[i1, i2, i3]
+                er = 0  # error real part
+                ei = 0  # error imag part
+                for i, pp in enumerate(pole_pair):
+                    residue = np.outer(model.residue_left[:, i], model.residue_right[:, i])
+                    r = residue[i1, i2]
+                    if pp == 0:
+                        xi = x[i]
+                        # steps of calculating yi
+                        a1 = -r.real * xi
+                        a2 = xi**2
+                        a3 = a2 + w**2
+                        a4 = a1 / a3
+                        er += a4
+                        a5 = -w * r.real / a3
+                        ei += a5
+                    elif pp == 1:
+                        xi_real = x[i]
+                        xi_imag = x[i + 1]
+                        # first for er
+                        a1 = -r.real * xi_real
+                        a2 = xi_imag - w
+                        a3 = r.imag * a2
+                        a4 = a1 - a3
+                        a5 = xi_real**2
+                        a6 = a2**2
+                        a7 = a5 + a6
+                        a8 = a4 / a7
+                        a9 = xi_imag + w
+                        a10 = r.imag * a9
+                        a11 = a1 - a10
+                        a12 = a9**2
+                        a13 = a5 + a12
+                        a14 = a11 / a13
+                        a15 = a8 + a14
+                        er += a15
+                        # then for ei
+                        a1 = -r.imag * xi_real
+                        a2 = xi_imag - w
+                        a3 = r.real * a2
+                        a4 = a1 + a3
+                        a5 = xi_real**2
+                        a6 = a2**2
+                        a7 = a5 + a6
+                        a8 = a4 / a7
+                        a9 = xi_imag + w
+                        a10 = r.real * a9
+                        a11 = -a1 - a10
+                        a12 = a9**2
+                        a13 = a5 + a12
+                        a14 = a11 / a13
+                        a15 = a8 + a14
+                        ei += a15
+                er += d - ele.real
+                ei += h * w - ele.imag
+                e = er**2 + ei**2
+                y += e
+    return y
+
+
+def matrix_cost_fct2(x, model, f, s):
+    pole_pair = pair_pole(model.pole)
+    pole = np.zeros(model.pole.shape, dtype=np.complex128)
+    for i, pp in enumerate(pole_pair):
+        if pp == 0:
+            pole[i] = x[i]
+        elif pp == 1:
+            pole[i] = x[i] + 1j*x[i+1]
+            pole[i+1] = x[i] - 1j*x[i+1]
+    tmp_model = RationalRankOneMtx(pole, model.residue_left, model.residue_right, model.const, model.linear)
+    error = tmp_model.model(s) - f
+    y = np.sum(np.abs(error)**2)
+    return y
+
+
+def d_matrix_cost_fct(x, model, f, s):
+    pole_pair = pair_pole(model.pole)
+    y = 0
+    dy = np.zeros(x.shape)
+    for i1 in range(np.size(f, 0)):
+        for i2 in range(np.size(f, 1)):
+            d = model.const[i1, i2].real
+            h = model.linear[i1, i2].real
+            for i3 in range(np.size(f, 2)):
+                w = s[i3].imag
+                ele = f[i1, i2, i3]
+                er = 0  # error real part
+                ei = 0  # error imag part
+                der = np.zeros(x.shape)
+                dei = np.zeros(x.shape)
+                for i, pp in enumerate(pole_pair):
+                    residue = np.outer(model.residue_left[:, i], model.residue_right[:, i])
+                    r = residue[i1, i2]
+                    if pp == 0:
+                        xi = x[i]
+                        dxi = np.zeros(x.shape)
+                        dxi[i] = 1
+                        # steps of calculating yi
+                        a1 = -r.real * xi
+                        da1 = -r.real * dxi
+                        a2 = xi**2
+                        da2 = 2 * xi * dxi
+                        a3 = a2 + w**2
+                        da3 = da2
+                        a4 = a1 / a3
+                        da4 = da1 / a3 - a1 / a3**2 * da3
+                        er += a4
+                        der += da4
+                        a5 = -w * r.real / a3
+                        da5 = w * r.real / a3**2 * da3
+                        ei += a5
+                        dei += da5
+                    elif pp == 1:
+                        xi_real = x[i]
+                        xi_imag = x[i + 1]
+                        dxi_real = np.zeros(x.shape)
+                        dxi_real[i] = 1
+                        dxi_imag = np.zeros(x.shape)
+                        dxi_imag[i+1] = 1
+                        # first for er
+                        a1 = -r.real * xi_real
+                        da1 = -r.real * dxi_real
+                        a2 = xi_imag - w
+                        da2 = dxi_imag
+                        a3 = r.imag * a2
+                        da3 = r.imag * da2
+                        a4 = a1 - a3
+                        da4 = da1 - da3
+                        a5 = xi_real**2
+                        da5 = 2 * xi_real * dxi_real
+                        a6 = a2**2
+                        da6 = 2 * a2 * da2
+                        a7 = a5 + a6
+                        da7 = da5 + da6
+                        a8 = a4 / a7
+                        da8 = da4 / a7 - a4 / a7**2 * da7
+                        a9 = xi_imag + w
+                        da9 = dxi_imag
+                        a10 = r.imag * a9
+                        da10 = r.imag * da9
+                        a11 = a1 - a10
+                        da11 = da1 - da10
+                        a12 = a9**2
+                        da12 = 2 * a9 * da9
+                        a13 = a5 + a12
+                        da13 = da5 + da12
+                        a14 = a11 / a13
+                        da14 = da11 / a13 - a11 / a13**2 * da13
+                        a15 = a8 + a14
+                        da15 = da8 + da14
+                        er += a15
+                        der += da15
+                        # then for ei
+                        a1 = -r.imag * xi_real
+                        da1 = -r.imag * dxi_real
+                        a2 = xi_imag - w
+                        da2 = dxi_imag
+                        a3 = r.real * a2
+                        da3 = r.real * da2
+                        a4 = a1 + a3
+                        da4 = da1 + da3
+                        a5 = xi_real**2
+                        da5 = 2 * xi_real * dxi_real
+                        a6 = a2**2
+                        da6 = 2 * a2 * da2
+                        a7 = a5 + a6
+                        da7 = da5 + da6
+                        a8 = a4 / a7
+                        da8 = da4 / a7 - a4 / a7**2 * da7
+                        a9 = xi_imag + w
+                        da9 = dxi_imag
+                        a10 = r.real * a9
+                        da10 = r.real * da9
+                        a11 = -a1 - a10
+                        da11 = -da1 - da10
+                        a12 = a9**2
+                        da12 = 2 * a9 * da9
+                        a13 = a5 + a12
+                        da13 = da5 + da12
+                        a14 = a11 / a13
+                        da14 = da11 / a13 - a11 / a13**2 * da13
+                        a15 = a8 + a14
+                        da15 = da8 + da14
+                        ei += a15
+                        dei += da15
+                er += d - ele.real
+                ei += h * w - ele.imag
+                e = er**2 + ei**2
+                de = 2 * er * der + 2 * ei * dei
+                y += e
+                dy += de
+    return dy
+
+
+def d_matrix_cost_fct2(x, model, f, s):
+    dy = np.zeros(x.shape)
+    e = 1e-10
+    for i, dyi in enumerate(dy):
+        p = np.zeros(x.shape)
+        p[i] = e
+        dy[i] = (matrix_cost_fct(x + p, model, f, s) - matrix_cost_fct(x - p, model, f, s)) / (2 * e)
+    return dy
 
 
 def matrix_fitting_rank_one_rescale(f, s, *args, **kwargs):
@@ -219,7 +456,7 @@ def matrix_fitting_rank_one_rescale(f, s, *args, **kwargs):
 
 def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
     if update != 'left' and update != 'right' and update != 'pole':
-        raise RuntimeError('The update must be set to left/right!')
+        raise RuntimeError('The update must be set to left/right/pole!')
 
     n_pole = len(fk.pole)
     n_freq = len(s)
