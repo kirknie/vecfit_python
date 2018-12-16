@@ -259,7 +259,7 @@ def coupled_siw_rank_one():
 
     # f_out = vecfit.matrix_fitting_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
     # f_out = f_out.rank_one()
-    f_out = vecfit.matrix_fitting_rank_one_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True, fixed_pole=poles)
+    f_out = vecfit.matrix_fitting_rank_one_rescale(s_z0, cs, n_pole=36, n_iter=10, has_const=True, has_linear=True)
     f_fit = f_out.model(cs)
 
     plot_matrix(np.abs(cs)/2/np.pi, s_z0, f_fit)
@@ -350,8 +350,8 @@ if __name__ == '__main__':
     # example2()
     # single_siw()
     # coupled_siw()
-    # coupled_siw_rank_one()
+    coupled_siw_rank_one()
     # dipole()
-    coupled_dipole()
+    # coupled_dipole()
 
 

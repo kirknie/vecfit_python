@@ -190,9 +190,17 @@ def matrix_fitting_rank_one(f, s, n_pole=10, n_iter=10, has_const=True, has_line
     fk = matrix_fitting(f, s, n_pole, n_iter, has_const, has_linear, fixed_pole)
     fk = fk.rank_one()
     for k in range(n_iter):
-        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update='left')
-        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update='right')
-    # fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole, update='pole')
+        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update_residue='left', update_pole=False)
+        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update_residue='right', update_pole=False)
+    # for k in range(n_iter):
+    #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update_residue='left', update_pole=False)
+    #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update_residue='right', update_pole=False)
+    # fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update_residue='right', update_pole=True)
+
+    # fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update='right')
+    # for k in range(n_iter):
+    #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update='left')
+    #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update='right')
     
     # # gradient descent on poles
     # # x = [real pole, complex pole real part, complex pole imag part]
@@ -454,9 +462,9 @@ def matrix_fitting_rank_one_rescale(f, s, *args, **kwargs):
     return f_model
 
 
-def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
-    if update != 'left' and update != 'right' and update != 'pole':
-        raise RuntimeError('The update must be set to left/right/pole!')
+def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update_residue, update_pole):
+    if update_residue != 'left' and update_residue != 'right' and update_residue is not None:
+        raise RuntimeError('The update_residue must be set to left/right/None!')
 
     n_pole = len(fk.pole)
     n_freq = len(s)
@@ -477,7 +485,7 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
     # Construct A
     # rows: element 00 all freq, element 01 all freq, ...
     # cols: element 0 of all poles, element 1 of all poles, const 00, const 01, ..., linear 00, linear 01, ...
-    if update == 'pole':
+    if update_residue is None:
         A = np.zeros((n_freq * n_vec, n_pole - n_fixed), dtype=np.complex128)
     else:
         A = np.zeros((n_freq * n_vec, n_pole * n_mat + (col_d + col_h) * n_vec + n_pole - n_fixed), dtype=np.complex128)
@@ -490,12 +498,12 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
                 row_range = range(idx*n_freq, (idx+1)*n_freq)
                 for k, p in enumerate(fk.pole):
                     if pole_pair[k] == 0:
-                        if update == 'left':
+                        if update_residue == 'left':
                             A[row_range, i * n_pole + k] = fk.residue_right[j, k] / (s - p)
                         else:
                             A[row_range, j * n_pole + k] = fk.residue_left[i, k] / (s - p)
                     if pole_pair[k] == 1:
-                        if update == 'left':
+                        if update_residue == 'left':
                             A[row_range, i * n_pole + k] = fk.residue_right[j, k] / (s - p) + fk.residue_right[j, k].conj() / (s - p.conj())
                             A[row_range, i * n_pole + k + 1] = 1j * fk.residue_right[j, k] / (s - p) - 1j * fk.residue_right[j, k].conj() / (s - p.conj())
                         else:
@@ -533,7 +541,7 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
 
     # x: element 0 of all poles, element 1 of all poles, const 00, const 01, ..., linear 00, linear 01, ...
-    if update != 'pole':
+    if update_residue is not None:
         rk = np.zeros([n_mat, n_pole], dtype=np.complex128)
         for i in range(n_mat):
             rk[i, :] = x[n_pole*i:n_pole*(i+1)]
@@ -554,26 +562,31 @@ def iteration_rank_one(f, s, fk, has_const, has_linear, fixed_pole, update):
             hk = x[n_pole * n_mat + n_vec * col_d:n_pole * n_mat + n_vec * col_d + n_vec]
             hk = vec2mat(hk, False)
 
-    if n_fixed == n_pole:
-        qk = np.array([])
+    if update_pole is True:
+        if n_fixed == n_pole:
+            qk = np.array([])
+        else:
+            qk = np.complex128(x[-n_pole + n_fixed:])
+        for i, pp in enumerate(pole_pair):
+            if pp == 1:
+                if i >= n_fixed:
+                    q1, q2 = qk[i-n_fixed:i-n_fixed+2]
+                    qk[i-n_fixed] = q1 + 1j * q2
+                    qk[i-n_fixed + 1] = q1 - 1j * q2
+        pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
+        if fixed_pole is not None:
+            pk = np.concatenate([fixed_pole, pk])
+        unstable = np.real(pk) > 0
+        if np.any(unstable):
+            print('Unstable poles!')
+        pk[unstable] -= 2*np.real(pk)[unstable]
     else:
-        qk = np.complex128(x[-n_pole + n_fixed:])
-    for i, pp in enumerate(pole_pair):
-        if pp == 1:
-            if i >= n_fixed:
-                q1, q2 = qk[i-n_fixed:i-n_fixed+2]
-                qk[i-n_fixed] = q1 + 1j * q2
-                qk[i-n_fixed + 1] = q1 - 1j * q2
-    pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
-    if fixed_pole is not None:
-        pk = np.concatenate([fixed_pole, pk])
-    unstable = np.real(pk) > 0
-    pk[unstable] -= 2*np.real(pk)[unstable]
+        pk = fk.pole
 
     # Convert the vector back to matrix
-    if update == 'pole':
+    if update_residue is None:
         return RationalRankOneMtx(pk, fk.residue_left, fk.residue_right, fk.const, fk.linear)
-    elif update == 'left':
+    elif update_residue == 'left':
         return RationalRankOneMtx(pk, rk, fk.residue_right, dk, hk)
     else:
         return RationalRankOneMtx(pk, fk.residue_left, rk, dk, hk)
