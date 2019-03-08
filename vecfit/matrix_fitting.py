@@ -852,3 +852,88 @@ def iteration_basis_rank_one(f, s, fk, has_const, has_linear, fixed_pole):
     return RationalMtx(pk, rk, dk, hk)
 
 
+# joint SVD (reference: approximate joint SVD algorithm based on Givens-Like Rotation)
+# input: a set of matrix for joint SVD (3D)
+# output: U, Lambda,Vh (Lambda is a 3D matrix and each page is diagonal)
+def joint_svd(mtx_set):
+    mat_size = np.shape(mtx_set)
+    mat_num = mat_size[2]
+    N = mat_size[0]
+#    a = np.random.randn(N, N)+1j*np.random.randn(N, N)
+#    u, s, vh = np.linalg.svd(a, full_matrices=True, compute_uv=True)
+    u = np.identity(N, dtype=np.complex128)
+    vh = np.identity(N, dtype=np.complex128)
+    v = np.matrix(vh).getH()
+    A_k = mtx_set*0
+    err_norm_pre = 0
+    for k in range(mat_num):
+        a = mtx_set[:, :, k]
+        A_k_temp = np.matmul(np.matmul(u, a), vh)
+        A_k[:, :, k] = A_k_temp
+        err_norm_pre = err_norm_pre + np.linalg.norm(A_k_temp, 'fro' )**2 - np.linalg.norm(np.diag(A_k_temp))**2
+
+    iter = 0
+    while True:
+        for i in range(N-1):
+            for j in range(i+1, N, 1):
+                R1 = np.identity(N, dtype=np.complex128)
+                R2 = R1
+                ak_ii = A_k[i, i, :]
+                ak_jj = A_k[j, j, :]
+                ak_ij = A_k[i, j, :]
+                ak_ji = A_k[j, i, :]
+                alpha1 = np.sum(np.matmul(np.conjugate(ak_ii), ak_jj))
+                alpha2 = np.sum(np.matmul(np.conjugate(ak_ii), ak_ji))
+                alpha3 = np.sum(np.matmul(ak_jj, np.conjugate(ak_ij)))
+                alpha4 = np.sum(np.matmul(ak_ii, np.conjugate(ak_ij)))
+                alpha5 = np.sum(np.matmul(np.conjugate(ak_jj), ak_ji))
+                beta1 = np.sum(abs(ak_ii ** 2) + abs(ak_jj ** 2))
+                M = np.matrix([[beta1, -2 * alpha1], [-2 * np.conjugate(alpha1), beta1]], dtype=np.complex128)
+                f = np.matrix([[alpha2 - alpha3], [alpha4 - alpha5]], dtype=np.complex128)
+                X = np.dot(np.linalg.inv(M), f)
+                x = X[0]
+                y = X[1]
+
+                lambda_x = 1 / np.sqrt(1 + abs(x ** 2))
+                lambda_y = 1 / np.sqrt(1 + abs(y ** 2))
+                R1[i, i] = lambda_x
+                R1[j, j] = lambda_x
+                R1[i, j] = lambda_x * np.conjugate(x)
+                R1[j, i] = -lambda_x * x
+
+                R2[i, i] = lambda_y
+                R2[j, j] = lambda_y
+                R2[i, j] = lambda_y * np.conjugate(y)
+                R2[j, i] = -lambda_y * y
+                u = np.dot(R1, u)
+                v = np.dot(R2, v)
+                for loop in range(mat_num):
+                    A_k[:, :, loop] = np.dot(np.dot(R1, A_k[:, :, loop]), np.matrix(R2).getH())
+
+        err_norm = 0
+        for loop in range(mat_num):
+            A_k_temp = A_k[:, :, loop]
+            err_norm = err_norm + np.linalg.norm(A_k_temp, 'fro') ** 2 - np.linalg.norm(np.diag(A_k_temp)) ** 2
+        iter = iter + 1
+
+        print(err_norm_pre, err_norm, iter)
+        if abs(err_norm - err_norm_pre) < 1e-6:
+            break
+        if err_norm > err_norm_pre:
+            break
+        err_norm_pre = err_norm
+
+    u_a = np.matrix(u).getH()
+    vh_a = v
+    A_remain = A_k*0
+    Lambda_A = A_k*0
+    err_norm = 0
+    orig_norm = 0
+    for loop in range(mat_num):
+        A_k_temp = A_k[:, :, loop]
+        A_k_diag = np.diag(np.diag(A_k_temp))
+        Lambda_A[:, :, loop] = A_k_diag
+        A_remain[:, :, loop] = mtx_set[:, :, loop] - np.dot(np.dot(u_a, A_k_diag), vh_a)
+        err_norm = err_norm + np.linalg.norm(A_remain[:, :, loop], 'fro') ** 2
+        orig_norm = orig_norm + np.linalg.norm(mtx_set[:, :, loop], 'fro') ** 2
+    return u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm

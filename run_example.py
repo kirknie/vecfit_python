@@ -8,6 +8,7 @@ Created on Sun Oct  1 15:27:46 2017
 import numpy as np
 import matplotlib.pyplot as plt
 import vecfit
+import scipy.io
 
 
 def plot_matrix(x, y, y2=None):
@@ -345,12 +346,124 @@ def coupled_dipole():
     plt.show()
 
 
+def coupled_siw_joint_svd_test():
+    s2p_file = './resource/two_SIW_antenna_39GHz_50mil.s2p'
+    freq, n, z, s, z0 = vecfit.read_snp(s2p_file)
+    s_z0 = np.zeros(z.shape, dtype=z.dtype)
+    cs = freq * 2j * np.pi
+    # z0 = 50
+    z0 = 190
+    for i in range(len(freq)):
+        s_z0[:, :, i] = np.matrix(z[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(
+            np.matrix(z[:, :, i] / z0 + np.identity(n)))
+    cs_all = np.logspace(10, 12, 1e5) * 1j
+    u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_z0)
+    s_odd = Lambda_A[0, 0, :]
+    s_even = Lambda_A[1, 1, :]
+    print('sum of original norm square is {:.5e}'.format(orig_norm))
+    print('sum of error norm square is {:.5e}'.format(err_norm))
+    ratio = err_norm/orig_norm
+    print('ratio is {:.5e}'.format(ratio))
+    # Even mode
+    f_even = vecfit.fit_s(s_even, cs, n_pole=19, n_iter=20, s_inf=1, bound_wt=1.1)
+
+    bound_even, bw_even = f_even.bound(np.inf, f0=39e9)
+    print('Bound even is {:.5e}'.format(bound_even))
+    print('BW even is {:.5e}'.format(bw_even))
+
+    bound_error_even = f_even.bound_error(s_even, cs, reflect=np.inf)
+    print('Bound error is {:.5e}'.format(bound_error_even))
+    integral_even = f_even.bound_integral(cs, reflect=np.inf)
+    integral_even = vecfit.bound_integral(s_even, cs, np.inf)
+    print('The integral of the even is {:.5e}'.format(integral_even))
+
+    print('check s for even', max(np.abs(f_even.model(cs_all))))
+
+    # Odd mode
+    f_odd = vecfit.fit_s(s_odd, cs, n_pole=17, n_iter=20, s_inf=1, bound_wt=0.62)
+
+    bound_odd, bw_odd = f_odd.bound(np.inf, f0=39e9)
+    print('Bound odd is {:.5e}'.format(bound_odd))
+    print('BW odd is {:.5e}'.format(bw_odd))
+
+    bound_error_odd = f_odd.bound_error(s_odd, cs, reflect=np.inf)
+    print('Bound error is {:.5e}'.format(bound_error_odd))
+    integral_odd = f_odd.bound_integral(cs, reflect=np.inf)
+    integral_odd = vecfit.bound_integral(s_odd, cs, np.inf)
+    print('The integral of the odd is {:.5e}'.format(integral_odd))
+
+    print('check s for odd', max(np.abs(f_odd.model(cs_all))))
+
+    # plots
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(111)
+    ax1.plot(freq, 20 * np.log10(np.abs(s_even)), 'b-')
+    f_even.plot(cs, ax=ax1, x_scale='log', y_scale='db', color='r', linestyle='--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_even - f_even.model(cs))), 'k--')
+
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot(111)
+    f_even.plot_improved_bound(2e10, 4e11, ax=ax2)
+
+    fig3 = plt.figure()
+    ax3 = fig3.add_subplot(111)
+    ax3.plot(freq, 20 * np.log10(np.abs(s_odd)), 'b-')
+    f_odd.plot(cs, ax=ax3, x_scale='log', y_scale='db', color='r', linestyle='--')
+    ax3.plot(freq, 20 * np.log10(np.abs(s_odd - f_odd.model(cs))), 'k--')
+
+    fig4 = plt.figure()
+    ax4 = fig4.add_subplot(111)
+    f_odd.plot_improved_bound(2e10, 4e11, ax=ax4)
+
+    plt.show()
+
+
+def coupled_dipole_joint_svd_test():
+    s2p_file = './resource/coupled_dipoles.s2p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s2p_file)
+    # z0 = 50
+    # s_data = (z_data-z0) / (z_data+z0)
+    cs = freq*2j*np.pi
+
+    # Fit even and odd mode separately
+    u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_data)
+    s_even = Lambda_A[0, 0, :]
+    s_odd = Lambda_A[1, 1, :]
+    # Even and odd mode
+    f_even = vecfit.fit_s(s_even, cs, n_pole=3, n_iter=20, s_inf=-1)
+    f_odd = vecfit.fit_s(s_odd, cs, n_pole=3, n_iter=20, s_inf=-1)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(211)
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_even)), 'b-')
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_even.model(cs))), 'r--')
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('S even Amplitude (dB)')
+    ax = fig.add_subplot(212)
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(s_odd)), 'b-')
+    ax.plot(np.abs(cs)/2/np.pi, 20 * np.log10(np.abs(f_odd.model(cs))), 'r--')
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('S odd Amplitude (dB)')
+    # plt.show()
+
+    # Try to fit S
+    fixed_pole = np.concatenate([f_even.pole, f_odd.pole])
+    # f_out = vecfit.matrix_fitting_rescale(s_data, cs, n_pole=6, n_iter=20, has_const=True, has_linear=False, fixed_pole=fixed_pole)
+    # f_out = f_out.rank_one()
+    f_out = vecfit.matrix_fitting_rank_one_rescale(s_data, cs, n_pole=6, n_iter=50, has_const=True, has_linear=True)
+    f_fit = f_out.model(cs)
+
+    plot_matrix(np.abs(cs)/2/np.pi, s_data, f_fit)
+    plt.show()
+
+
 if __name__ == '__main__':
     # example1()
     # example2()
     # single_siw()
-    # coupled_siw()
-    coupled_siw_rank_one()
+    # coupled_siw_joint_svd_test()
+    coupled_dipole_joint_svd_test()
+    # coupled_siw_rank_one()
     # dipole()
     # coupled_dipole()
 
