@@ -121,6 +121,8 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole):
     if fixed_pole is not None:
         pk = np.concatenate([fixed_pole, pk])
     unstable = np.real(pk) > 0
+    if np.any(unstable):
+        print('Unstable poles!')
     pk[unstable] -= 2*np.real(pk)[unstable]
 
     # Convert the vector back to matrix
@@ -188,10 +190,16 @@ def final_step(f, s, fk, has_const, has_linear):
 
 def matrix_fitting_rank_one(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None):
     fk = matrix_fitting(f, s, n_pole, n_iter, has_const, has_linear, fixed_pole)
-    fk = fk.rank_one()
+    # fk = fk.rank_one()
+
+    # call iteration with basis
     for k in range(n_iter):
-        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update_residue='left', update_pole=False)
-        fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update_residue='right', update_pole=False)
+        fk = iteration_basis_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole)
+
+
+    # for k in range(n_iter):
+    #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update_residue='left', update_pole=False)
+    #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fk.pole, update_residue='right', update_pole=False)
     # for k in range(n_iter):
     #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update_residue='left', update_pole=False)
     #     fk = iteration_rank_one(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=None, update_residue='right', update_pole=False)
@@ -452,8 +460,9 @@ def matrix_fitting_rank_one_rescale(f, s, *args, **kwargs):
 
     f_model = matrix_fitting_rank_one(f/f_scale, s/s_scale, *args, **kwargs)
     f_model.pole *= s_scale
-    f_model.residue_left *= np.sqrt(f_scale * s_scale)
-    f_model.residue_right *= np.sqrt(f_scale * s_scale)
+    f_model.residue *= f_scale * s_scale
+    # f_model.residue_left *= np.sqrt(f_scale * s_scale)
+    # f_model.residue_right *= np.sqrt(f_scale * s_scale)
     if f_model.const is not None:
         f_model.const *= f_scale
     if f_model.linear is not None:
@@ -710,10 +719,136 @@ def iteration_symmetric_rank_one(f, s, fk, has_const, has_linear, fixed_pole, up
     if fixed_pole is not None:
         pk = np.concatenate([fixed_pole, pk])
     unstable = np.real(pk) > 0
+    if np.any(unstable):
+        print('Unstable poles!')
     pk[unstable] -= 2*np.real(pk)[unstable]
 
     # Convert the vector back to matrix
     return RationalRankOneMtx(pk, rk, dk, hk)
 
+
+def iteration_basis_rank_one(f, s, fk, has_const, has_linear, fixed_pole):
+    n_pole = len(fk.pole)
+    n_freq = len(s)
+    n_mat = np.size(f, 0)
+    f_vec = mat2vec(f, False)  # non-symmetric matrix
+    n_vec = np.size(f_vec, 0)
+    n_fixed = 0
+    if fixed_pole is not None:
+        n_fixed = len(fixed_pole)
+        fk.pole[:n_fixed] = fixed_pole  # should not need this, fixed poles already in there
+    pole_pair = pair_pole(fk.pole)
+
+    # hard code the even and odd mode basis for two antennas
+    if n_mat != 2:
+        raise RuntimeError('Currently only support 2 antennas!')
+    # all basis are real
+    basis_left = np.array([[1, 1], [1, -1]], dtype=np.complex128) / np.sqrt(2)
+    basis_right = np.array([[1, 1], [1, -1]], dtype=np.complex128) / np.sqrt(2)
+    n_basis = np.size(basis_left, 1)
+
+    # Construct the set of linear equations A*x=b
+    # x = [r_i, d, h, q_i]
+    col_d = 1 if has_const else 0
+    col_h = 1 if has_linear else 0
+
+    # Construct A
+    # rows: element 00 all freq, element 01 all freq, ...
+    # cols: basis 0 of all poles, basis 1 of all poles, const 00, const 01, ..., linear 00, linear 01, ...
+
+    A = np.zeros((n_freq * n_vec, n_pole * n_basis + (col_d + col_h) * n_vec + n_pole - n_fixed), dtype=np.complex128)
+    # A1 = np.zeros((n_freq, n_pole + col_d + col_h), dtype=A.dtype)  # for r, d, h, not q
+
+    idx = 0
+    for i in range(n_mat):
+        for j in range(n_mat):
+            # Fill in the corresponding rows of A, constraints on S_ij
+            row_range = range(idx * n_freq, (idx + 1) * n_freq)
+            for bi in range(n_basis):
+                basis = np.outer(basis_left[:, bi], basis_right[:, bi])  # must be real matrix
+                basis_element = basis[i, j]
+                for k, p in enumerate(fk.pole):
+                    if pole_pair[k] == 0:
+                        A[row_range, bi * n_pole + k] += basis_element / (s - p)
+                    elif pole_pair[k] == 1:
+                        A[row_range, bi * n_pole + k] += basis_element / (s - p) + basis_element / (s - p.conj())
+                        A[row_range, bi * n_pole + k + 1] += 1j * basis_element / (s - p) - 1j * basis_element / (s - p.conj())
+            if has_const:
+                A[row_range, n_pole * n_basis + idx] = 1
+            if has_linear:
+                A[row_range, n_pole * n_basis + col_d * n_vec + idx] = s
+            idx += 1
+
+    for i in range(n_vec):
+        row_range = range(i*n_freq, (i+1)*n_freq)
+        for j in range(n_fixed, n_pole):
+            p = fk.pole[j]
+            if pole_pair[j] == 0:
+                A[row_range, -n_pole+j] = -f_vec[i, :] / (s - p)
+            elif pole_pair[j] == 1:
+                A[row_range, -n_pole+j] = -f_vec[i, :] / (s - p) - f_vec[i, :] / (s - p.conj())
+                A[row_range, -n_pole+j+1] = -1j * f_vec[i, :] / (s - p) - 1j * f_vec[i, :] / (s - p.conj())
+
+    # Form real equations from complex equations
+    A = np.vstack([np.real(A), np.imag(A)])
+
+    cA = np.linalg.cond(A)
+    if cA > 1e13:
+        print('Warning: Ill Conditioned Matrix.  Cond(A)={:.2e}  Consider scaling the problem down'.format(cA))
+
+    # Construct b
+    # b: element 00 all freq, element 01 all freq, ...
+    b = f_vec.reshape(n_freq * n_vec)  # order in rows (nF)
+    b = np.concatenate([np.real(b), np.imag(b)])
+
+    # Solve for x
+    x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
+
+    # x: basis 0 of all poles, basis 1 of all poles, const 00, const 01, ..., linear 00, linear 01, ...
+    rk_basis = np.zeros([n_basis, n_pole], dtype=np.complex128)
+    for i in range(n_basis):
+        rk_basis[i, :] = x[n_pole * i:n_pole * (i + 1)]
+    for i, pp in enumerate(pole_pair):
+        if pp == 1:
+            r1 = np.copy(rk_basis[:, i])
+            r2 = np.copy(rk_basis[:, i + 1])
+            rk_basis[:, i] = r1 + 1j * r2
+            rk_basis[:, i + 1] = r1 - 1j * r2
+    rk = np.zeros([n_mat, n_mat, n_pole], dtype=np.complex128)
+    for i in range(n_pole):
+        for j in range(n_basis):
+            rk[:, :, i] += rk_basis[j, i] * np.outer(basis_left[:, j], basis_right[:, j])
+
+    if col_d is None:
+        dk = None
+    else:
+        dk = x[n_pole * n_basis:n_pole * n_basis + n_vec]
+        dk = vec2mat(dk, False)
+    if col_h is None:
+        hk = None
+    else:
+        hk = x[n_pole * n_basis + n_vec * col_d:n_pole * n_basis + n_vec * col_d + n_vec]
+        hk = vec2mat(hk, False)
+
+    if n_fixed == n_pole:
+        qk = np.array([])
+    else:
+        qk = np.complex128(x[-n_pole + n_fixed:])
+    for i, pp in enumerate(pole_pair):
+        if pp == 1:
+            if i >= n_fixed:
+                q1, q2 = qk[i - n_fixed:i - n_fixed + 2]
+                qk[i - n_fixed] = q1 + 1j * q2
+                qk[i - n_fixed + 1] = q1 - 1j * q2
+    pk = calculate_zero(fk.pole[n_fixed:], qk, 1)
+    if fixed_pole is not None:
+        pk = np.concatenate([fixed_pole, pk])
+    unstable = np.real(pk) > 0
+    if np.any(unstable):
+        print('Unstable poles!')
+    pk[unstable] -= 2 * np.real(pk)[unstable]
+
+    # Convert the vector back to matrix
+    return RationalMtx(pk, rk, dk, hk)
 
 
