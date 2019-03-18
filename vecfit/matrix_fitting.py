@@ -877,7 +877,7 @@ def joint_svd(mtx_set):
         for i in range(N-1):
             for j in range(i+1, N, 1):
                 R1 = np.identity(N, dtype=np.complex128)
-                R2 = R1
+                R2 = np.identity(N, dtype=np.complex128)
                 ak_ii = A_k[i, i, :]
                 ak_jj = A_k[j, j, :]
                 ak_ij = A_k[i, j, :]
