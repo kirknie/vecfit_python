@@ -299,7 +299,7 @@ class RationalMtx:
                 h = other.linear
             else:
                 h += other.linear
-        return RationalFct(p, r, d, h)
+        return RationalMtx(p, r, d, h)
 
     def __sub__(self, other):
         p = np.concatenate([self.pole, other.pole])

@@ -457,14 +457,166 @@ def coupled_dipole_joint_svd_test():
     plt.show()
 
 
+def skycross_antennas():
+    snp_file = './resource/Skycross_4_parallel_fine2.s4p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(snp_file)
+    # z0 = 50
+    # s_data = (z_data-z0) / (z_data+z0)
+    cs = freq*2j*np.pi
+    cs_all = np.logspace(0, 15, 10000)*2j*np.pi
+
+    # Fit modes separately
+    s_inf = -1
+    inf_weight = 1e6
+    s_data = np.concatenate([s_data, np.reshape(s_inf * inf_weight * np.identity(n), [n, n, 1])], 2)
+    u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_data)
+    s_data = s_data[:, :, :-1]
+    Lambda_A = Lambda_A[:, :, :-1]
+    A_remain = A_remain[:, :, :-1]
+
+    # poles_by_mode = [5, 7, 9, 6]
+    poles_by_mode = [5, 6, 5, 6]
+    f_by_mode = []
+    total_bound = 0.0
+    for i in range(n):
+        s_mode = Lambda_A[i, i, :]
+        f_mode = vecfit.fit_s(s_mode * np.exp(1j*np.pi*0), cs, n_pole=poles_by_mode[i], n_iter=20, s_inf=s_inf)
+        mode_bound = f_mode.bound(np.inf)
+        print('Mode {} bound is {:.2e}'.format(i, mode_bound[0]))
+        total_bound += mode_bound[0]
+        f_by_mode.append(f_mode)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(np.abs(cs) / 2 / np.pi, 20 * np.log10(np.abs(s_mode)), 'b-')
+        ax.semilogx(np.abs(cs_all) / 2 / np.pi, 20 * np.log10(np.abs(f_mode.model(cs_all))), 'r--')
+        ax.grid(True)
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('S even Amplitude (dB)')
+    total_bound /= n
+    print('Total bound is {:.2e}'.format(total_bound))
+    # Put the modes back to matrix
+    pole = np.zeros([np.sum(poles_by_mode)], dtype=np.complex128)
+    residue = np.zeros([n, n, np.sum(poles_by_mode)], dtype=np.complex128)
+    const = np.zeros([n, n], dtype=np.complex128)
+    idx = 0
+    for i in range(n):
+        tmp_matrix = np.zeros([n, n], dtype=np.complex128)
+        tmp_matrix[i, i] = 1
+        pole_range = np.array(range(idx, idx+poles_by_mode[i]))
+
+        pole[pole_range] = f_by_mode[i].pole
+        for j in range(poles_by_mode[i]):
+            residue_matrix = np.dot(np.dot(u_a, f_by_mode[i].residue[j]*tmp_matrix), vh_a)
+            residue[:, :, pole_range[j]] = residue_matrix
+        const += np.dot(np.dot(u_a, f_by_mode[i].const*tmp_matrix), vh_a)
+        idx += poles_by_mode[i]
+    s_matrix = vecfit.RationalMtx(pole, residue, const)
+
+    # do another fit for the remaining errors
+    s_inf = -1
+    inf_weight = 1e6
+    s_remain = np.concatenate([A_remain, np.reshape(s_inf * inf_weight * np.identity(n), [n, n, 1])], 2)
+    u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_remain)
+    s_remain = s_remain[:, :, :-1]
+    Lambda_A = Lambda_A[:, :, :-1]
+    A_remain = A_remain[:, :, :-1]
+
+    poles_by_mode = [7, 11, 8, 9]
+    f_by_mode = []
+    total_bound = 0.0
+    for i in range(n):
+        s_mode = Lambda_A[i, i, :]
+        f_mode = vecfit.fit_s(s_mode * np.exp(1j*np.pi*0), cs, n_pole=poles_by_mode[i], n_iter=20, s_inf=s_inf)
+        mode_bound = f_mode.bound(np.inf)
+        print('Mode {} bound is {:.2e}'.format(i, mode_bound[0]))
+        total_bound += mode_bound[0]
+        f_by_mode.append(f_mode)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(np.abs(cs) / 2 / np.pi, 20 * np.log10(np.abs(s_mode)), 'b-')
+        ax.semilogx(np.abs(cs_all) / 2 / np.pi, 20 * np.log10(np.abs(f_mode.model(cs_all))), 'r--')
+        ax.grid(True)
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('S even Amplitude (dB)')
+    total_bound /= n
+    print('Total bound is {:.2e}'.format(total_bound))
+    # Put the modes back to matrix
+    pole = np.zeros([np.sum(poles_by_mode)], dtype=np.complex128)
+    residue = np.zeros([n, n, np.sum(poles_by_mode)], dtype=np.complex128)
+    const = np.zeros([n, n], dtype=np.complex128)
+    idx = 0
+    for i in range(n):
+        tmp_matrix = np.zeros([n, n], dtype=np.complex128)
+        tmp_matrix[i, i] = 1
+        pole_range = np.array(range(idx, idx+poles_by_mode[i]))
+
+        pole[pole_range] = f_by_mode[i].pole
+        for j in range(poles_by_mode[i]):
+            residue_matrix = np.dot(np.dot(u_a, f_by_mode[i].residue[j]*tmp_matrix), vh_a)
+            residue[:, :, pole_range[j]] = residue_matrix
+        const += np.dot(np.dot(u_a, f_by_mode[i].const*tmp_matrix), vh_a)
+        idx += poles_by_mode[i]
+    # s_matrix = vecfit.RationalMtx(pole, residue, const) + s_matrix
+
+    # calculate the bound error
+    s_fit = s_matrix.model(cs)
+    s_error = s_fit - s_data
+
+    u, sigma, vh = np.linalg.svd(np.moveaxis(s_error, -1, 0))
+    sigma_error = sigma[:, 0].flatten()
+    u, sigma, vh = np.linalg.svd(np.moveaxis(s_data, -1, 0))
+    sigma_max = sigma[:, 0].flatten()
+    sigma_min = sigma[:, -1].flatten()
+
+    rho = (2 * sigma_error) / (1 - np.power(sigma_max, 2)) * np.sqrt(1 + (sigma_max**2 - sigma_min**2) / (1 - sigma_max)**2)
+
+
+    tau = 0.3162278
+    int_fct = vecfit.f_integral(cs.imag, np.inf) / 2 * np.log(1 + (1 - tau ** 2) / tau ** 2 * rho)
+    delta_b = vecfit.num_integral(cs.imag, int_fct)
+    print('Bound error is {:.2e}'.format(delta_b))
+
+    # plot the s_matrix
+    s = 2j * np.pi * freq
+    s_model = s_matrix.model(s)
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(321)
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 0, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 0, :].flatten())), 'r--')
+    # ax1.plot(freq, 20 * np.log10(np.abs((s_data - s_model)[0, 0, :].flatten())), 'k--')
+
+    ax1 = fig1.add_subplot(322)
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 1, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 1, :].flatten())), 'r--')
+
+    ax1 = fig1.add_subplot(323)
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 2, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 2, :].flatten())), 'r--')
+
+    ax1 = fig1.add_subplot(324)
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 3, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 3, :].flatten())), 'r--')
+
+    ax1 = fig1.add_subplot(325)
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[1, 1, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[1, 1, :].flatten())), 'r--')
+
+    ax1 = fig1.add_subplot(326)
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[1, 2, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[1, 2, :].flatten())), 'r--')
+
+    plt.show()
+
+
 if __name__ == '__main__':
     # example1()
     # example2()
     # single_siw()
     # coupled_siw_joint_svd_test()
-    coupled_dipole_joint_svd_test()
+    # coupled_dipole_joint_svd_test()
     # coupled_siw_rank_one()
     # dipole()
     # coupled_dipole()
+    skycross_antennas()
 
 
