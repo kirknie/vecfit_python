@@ -468,14 +468,14 @@ def skycross_antennas():
     # Fit modes separately
     s_inf = -1
     inf_weight = 1e6
-    s_data = np.concatenate([s_data, np.reshape(s_inf * inf_weight * np.identity(n), [n, n, 1])], 2)
+    s_data = np.concatenate([s_data, np.reshape(inf_weight * np.identity(n), [n, n, 1])], 2)
     u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_data)
     s_data = s_data[:, :, :-1]
     Lambda_A = Lambda_A[:, :, :-1]
     A_remain = A_remain[:, :, :-1]
 
-    # poles_by_mode = [5, 7, 9, 6]
-    poles_by_mode = [5, 6, 5, 6]
+    poles_by_mode = [5, 7, 9, 6]
+    # poles_by_mode = [5, 6, 5, 6]
     f_by_mode = []
     total_bound = 0.0
     for i in range(n):
@@ -515,7 +515,7 @@ def skycross_antennas():
     # do another fit for the remaining errors
     s_inf = -1
     inf_weight = 1e6
-    s_remain = np.concatenate([A_remain, np.reshape(s_inf * inf_weight * np.identity(n), [n, n, 1])], 2)
+    s_remain = np.concatenate([A_remain, np.reshape(inf_weight * np.identity(n), [n, n, 1])], 2)
     u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_remain)
     s_remain = s_remain[:, :, :-1]
     Lambda_A = Lambda_A[:, :, :-1]
@@ -556,7 +556,7 @@ def skycross_antennas():
             residue[:, :, pole_range[j]] = residue_matrix
         const += np.dot(np.dot(u_a, f_by_mode[i].const*tmp_matrix), vh_a)
         idx += poles_by_mode[i]
-    # s_matrix = vecfit.RationalMtx(pole, residue, const) + s_matrix
+    s_matrix = vecfit.RationalMtx(pole, residue, const) + s_matrix
 
     # calculate the bound error
     s_fit = s_matrix.model(cs)
@@ -575,6 +575,10 @@ def skycross_antennas():
     int_fct = vecfit.f_integral(cs.imag, np.inf) / 2 * np.log(1 + (1 - tau ** 2) / tau ** 2 * rho)
     delta_b = vecfit.num_integral(cs.imag, int_fct)
     print('Bound error is {:.2e}'.format(delta_b))
+
+    int_fct = 1 - np.sum(sigma**2, 1) / n
+    unmatched_integral = vecfit.num_integral(cs.imag, int_fct)
+    print('Unmatched integral is {:.2e}'.format(unmatched_integral))
 
     # plot the s_matrix
     s = 2j * np.pi * freq
