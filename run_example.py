@@ -466,7 +466,7 @@ def skycross_antennas():
     cs_all = np.logspace(0, 15, 10000)*2j*np.pi
 
     # Fit modes separately
-    s_inf = -1
+    s_inf = 1
     inf_weight = 1e6
     s_data = np.concatenate([s_data, np.reshape(inf_weight * np.identity(n), [n, n, 1])], 2)
     u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_data)
@@ -474,14 +474,14 @@ def skycross_antennas():
     Lambda_A = Lambda_A[:, :, :-1]
     A_remain = A_remain[:, :, :-1]
 
-    poles_by_mode = [5, 7, 9, 6]
-    # poles_by_mode = [5, 6, 5, 6]
+    # poles_by_mode = [5, 7, 9, 6]
+    poles_by_mode = [5, 8, 5, 7]  # s_inf = 1
     f_by_mode = []
     total_bound = 0.0
     for i in range(n):
         s_mode = Lambda_A[i, i, :]
-        f_mode = vecfit.fit_s(s_mode * np.exp(1j*np.pi*0), cs, n_pole=poles_by_mode[i], n_iter=20, s_inf=s_inf)
-        mode_bound = f_mode.bound(np.inf)
+        f_mode = vecfit.fit_s(s_mode * np.exp(1j*np.pi*0), cs, n_pole=poles_by_mode[i], n_iter=20, s_dc=s_inf)
+        mode_bound = f_mode.bound(0)
         print('Mode {} bound is {:.2e}'.format(i, mode_bound[0]))
         total_bound += mode_bound[0]
         f_by_mode.append(f_mode)
@@ -512,51 +512,51 @@ def skycross_antennas():
         idx += poles_by_mode[i]
     s_matrix = vecfit.RationalMtx(pole, residue, const)
 
-    # do another fit for the remaining errors
-    s_inf = -1
-    inf_weight = 1e6
-    s_remain = np.concatenate([A_remain, np.reshape(inf_weight * np.identity(n), [n, n, 1])], 2)
-    u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_remain)
-    s_remain = s_remain[:, :, :-1]
-    Lambda_A = Lambda_A[:, :, :-1]
-    A_remain = A_remain[:, :, :-1]
-
-    poles_by_mode = [7, 11, 8, 9]
-    f_by_mode = []
-    total_bound = 0.0
-    for i in range(n):
-        s_mode = Lambda_A[i, i, :]
-        f_mode = vecfit.fit_s(s_mode * np.exp(1j*np.pi*0), cs, n_pole=poles_by_mode[i], n_iter=20, s_inf=s_inf)
-        mode_bound = f_mode.bound(np.inf)
-        print('Mode {} bound is {:.2e}'.format(i, mode_bound[0]))
-        total_bound += mode_bound[0]
-        f_by_mode.append(f_mode)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(np.abs(cs) / 2 / np.pi, 20 * np.log10(np.abs(s_mode)), 'b-')
-        ax.semilogx(np.abs(cs_all) / 2 / np.pi, 20 * np.log10(np.abs(f_mode.model(cs_all))), 'r--')
-        ax.grid(True)
-        ax.set_xlabel('Frequency (Hz)')
-        ax.set_ylabel('S even Amplitude (dB)')
-    total_bound /= n
-    print('Total bound is {:.2e}'.format(total_bound))
-    # Put the modes back to matrix
-    pole = np.zeros([np.sum(poles_by_mode)], dtype=np.complex128)
-    residue = np.zeros([n, n, np.sum(poles_by_mode)], dtype=np.complex128)
-    const = np.zeros([n, n], dtype=np.complex128)
-    idx = 0
-    for i in range(n):
-        tmp_matrix = np.zeros([n, n], dtype=np.complex128)
-        tmp_matrix[i, i] = 1
-        pole_range = np.array(range(idx, idx+poles_by_mode[i]))
-
-        pole[pole_range] = f_by_mode[i].pole
-        for j in range(poles_by_mode[i]):
-            residue_matrix = np.dot(np.dot(u_a, f_by_mode[i].residue[j]*tmp_matrix), vh_a)
-            residue[:, :, pole_range[j]] = residue_matrix
-        const += np.dot(np.dot(u_a, f_by_mode[i].const*tmp_matrix), vh_a)
-        idx += poles_by_mode[i]
-    s_matrix = vecfit.RationalMtx(pole, residue, const) + s_matrix
+    # # do another fit for the remaining errors
+    # s_inf = -1
+    # inf_weight = 1e6
+    # s_remain = np.concatenate([A_remain, np.reshape(inf_weight * np.identity(n), [n, n, 1])], 2)
+    # u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_remain)
+    # s_remain = s_remain[:, :, :-1]
+    # Lambda_A = Lambda_A[:, :, :-1]
+    # A_remain = A_remain[:, :, :-1]
+    #
+    # poles_by_mode = [7, 11, 8, 9]
+    # f_by_mode = []
+    # total_bound = 0.0
+    # for i in range(n):
+    #     s_mode = Lambda_A[i, i, :]
+    #     f_mode = vecfit.fit_s(s_mode * np.exp(1j*np.pi*0), cs, n_pole=poles_by_mode[i], n_iter=20, s_inf=s_inf)
+    #     mode_bound = f_mode.bound(np.inf)
+    #     print('Mode {} bound is {:.2e}'.format(i, mode_bound[0]))
+    #     total_bound += mode_bound[0]
+    #     f_by_mode.append(f_mode)
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot(111)
+    #     ax.plot(np.abs(cs) / 2 / np.pi, 20 * np.log10(np.abs(s_mode)), 'b-')
+    #     ax.semilogx(np.abs(cs_all) / 2 / np.pi, 20 * np.log10(np.abs(f_mode.model(cs_all))), 'r--')
+    #     ax.grid(True)
+    #     ax.set_xlabel('Frequency (Hz)')
+    #     ax.set_ylabel('S even Amplitude (dB)')
+    # total_bound /= n
+    # print('Total bound is {:.2e}'.format(total_bound))
+    # # Put the modes back to matrix
+    # pole = np.zeros([np.sum(poles_by_mode)], dtype=np.complex128)
+    # residue = np.zeros([n, n, np.sum(poles_by_mode)], dtype=np.complex128)
+    # const = np.zeros([n, n], dtype=np.complex128)
+    # idx = 0
+    # for i in range(n):
+    #     tmp_matrix = np.zeros([n, n], dtype=np.complex128)
+    #     tmp_matrix[i, i] = 1
+    #     pole_range = np.array(range(idx, idx+poles_by_mode[i]))
+    #
+    #     pole[pole_range] = f_by_mode[i].pole
+    #     for j in range(poles_by_mode[i]):
+    #         residue_matrix = np.dot(np.dot(u_a, f_by_mode[i].residue[j]*tmp_matrix), vh_a)
+    #         residue[:, :, pole_range[j]] = residue_matrix
+    #     const += np.dot(np.dot(u_a, f_by_mode[i].const*tmp_matrix), vh_a)
+    #     idx += poles_by_mode[i]
+    # s_matrix = vecfit.RationalMtx(pole, residue, const) + s_matrix
 
     # calculate the bound error
     s_fit = s_matrix.model(cs)
@@ -572,11 +572,11 @@ def skycross_antennas():
 
 
     tau = 0.3162278
-    int_fct = vecfit.f_integral(cs.imag, np.inf) / 2 * np.log(1 + (1 - tau ** 2) / tau ** 2 * rho)
+    int_fct = vecfit.f_integral(cs.imag, 0) / 2 * np.log(1 + (1 - tau ** 2) / tau ** 2 * rho)
     delta_b = vecfit.num_integral(cs.imag, int_fct)
     print('Bound error is {:.2e}'.format(delta_b))
 
-    int_fct = 1 - np.sum(sigma**2, 1) / n
+    int_fct = vecfit.f_integral(cs.imag, 0) * (1 - np.sum(sigma**2, 1) / n)
     unmatched_integral = vecfit.num_integral(cs.imag, int_fct)
     print('Unmatched integral is {:.2e}'.format(unmatched_integral))
 
