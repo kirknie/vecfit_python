@@ -138,7 +138,8 @@ def single_siw():
     cs = freq*2j*np.pi
 
     # Try to fit S
-    f_out = vecfit.fit_s(s_data, cs, n_pole=18, n_iter=20, s_dc=0, s_inf=1, bound_wt=0.27)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=18, n_iter=20, s_dc=0, s_inf=1, bound_wt=0.27)
+    f_out = vecfit.fit_s_auto(s_data, cs)
 
     bound, bw = f_out.bound(np.inf, f0=39e9)
     print('Bound is {:.5e}'.format(bound))
@@ -277,7 +278,8 @@ def dipole():
     # Try to fit S
     # f_out = vecfit.fit_s(s_data, cs, n_pole=3, n_iter=20, s_inf=-1)
     # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1)
-    f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1, bound_wt=0.3)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1, bound_wt=0.3)
+    f_out = vecfit.fit_s_auto(s_data, cs)
 
     # f_out = vecfit.fit_s(s_data, cs, n_pole=9, n_iter=20, s_dc=1)
 
@@ -615,12 +617,12 @@ def skycross_antennas():
 if __name__ == '__main__':
     # example1()
     # example2()
-    # single_siw()
+    single_siw()
     # coupled_siw_joint_svd_test()
     # coupled_dipole_joint_svd_test()
     # coupled_siw_rank_one()
     # dipole()
     # coupled_dipole()
-    skycross_antennas()
+    # skycross_antennas()
 
 

@@ -5,6 +5,7 @@ Created on Sun Oct  1 23:19:55 2017
 @author: kirknie
 """
 
+import numpy as np
 from .vector_fitting import vector_fitting_rescale
 
 
@@ -42,3 +43,29 @@ def fit_s(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
 
     return f_model
 
+
+def fit_s_auto(f, s):
+    # automatically choose parameters for fit_s()
+    n_iter = 20
+    n_pole = 2
+    max_pole = 50
+    # loop until certain criterion is met: small error, passivity
+    while n_pole <= max_pole:
+        print('Modeling with {} poles...'.format(n_pole))
+        for s_dc, s_inf in [(None, -1), (None, 1), (-1, None), (1, None)]:
+            f_model = fit_s(f, s, n_pole, n_iter, s_dc, s_inf)  # do not put weight yet
+
+            # check error
+            error_limit = 10**(-20/20)
+            small_error = np.linalg.norm(f_model.model(s) - f, np.inf) < error_limit
+            s_all = np.logspace(np.log10(np.min(np.abs(s)))-3, np.log10(np.max(np.abs(s)))+3, int(1e5)) * 1j
+            passive = np.all(np.abs(f_model.model(s_all)) <= 1)
+            if small_error and passive:
+                break
+        if small_error and passive:
+            break
+        n_pole += 1
+    else:
+        raise RuntimeError('Fail to fit the S-parameter!')
+
+    return f_model
