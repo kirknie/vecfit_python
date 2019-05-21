@@ -614,15 +614,160 @@ def skycross_antennas():
     plt.show()
 
 
+def two_ifa():
+    snp_file = './resource/Orthogonal_IFA_Free_Space.s2p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(snp_file)
+    # z0 = 50
+    # s_data = (z_data-z0) / (z_data+z0)
+    cs = freq*2j*np.pi
+    cs_all = np.logspace(5, 13, 10000)*2j*np.pi
+
+    # Fit modes separately
+    s_inf = 1
+    inf_weight = 1e6
+    s_data = np.concatenate([s_data, np.reshape(inf_weight * np.identity(n), [n, n, 1])], 2)
+    u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_data)
+    s_data = s_data[:, :, :-1]
+    Lambda_A = Lambda_A[:, :, :-1]
+    A_remain = A_remain[:, :, :-1]
+    A_model = s_data - A_remain
+
+    f1_out = vecfit.fit_s_auto(Lambda_A[0, 0, :], cs)
+    f2_out = vecfit.fit_s_auto(Lambda_A[1, 1, :], cs)
+
+    # Put the modes back to matrix
+    tmp_matrix1 = np.zeros([n, n], dtype=np.complex128)
+    tmp_matrix1[0, 0] = 1
+    tmp_matrix2 = np.zeros([n, n], dtype=np.complex128)
+    tmp_matrix2[1, 1] = 1
+    pole = np.zeros([len(f1_out.pole) + len(f2_out.pole)], dtype=np.complex128)
+    residue = np.zeros([n, n, len(f1_out.pole) + len(f2_out.pole)], dtype=np.complex128)
+    const = np.zeros([n, n], dtype=np.complex128)
+
+    pole[0:len(f1_out.pole)] = f1_out.pole
+    pole[len(f1_out.pole):len(f1_out.pole) + len(f2_out.pole)] = f2_out.pole
+    for i in range(len(f1_out.pole)):
+        residue_matrix = np.dot(np.dot(u_a, f1_out.residue[i] * tmp_matrix1), vh_a)
+        residue[:, :, i] = residue_matrix
+    for i in range(len(f2_out.pole)):
+        residue_matrix = np.dot(np.dot(u_a, f2_out.residue[i] * tmp_matrix2), vh_a)
+        residue[:, :, len(f1_out.pole) + i] = residue_matrix
+
+    const = np.dot(np.dot(u_a, f1_out.const * tmp_matrix1), vh_a) + np.dot(np.dot(u_a, f1_out.const * tmp_matrix2), vh_a)
+    s_matrix = vecfit.RationalMtx(pole, residue, const)
+    s = 2j * np.pi * freq
+    s_model = s_matrix.model(s)
+
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(221)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[0, 0, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 0, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 0, :].flatten())), 'k-')
+    # ax1.plot(freq, 20 * np.log10(np.abs((s_data - s_model)[0, 0, :].flatten())), 'k--')
+
+    ax1 = fig1.add_subplot(222)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[0, 1, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 1, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 1, :].flatten())), 'k-')
+
+    ax1 = fig1.add_subplot(223)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[1, 0, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[1, 0, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[1, 0, :].flatten())), 'k-')
+
+    ax1 = fig1.add_subplot(224)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[1, 1, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[1, 1, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[1, 1, :].flatten())), 'k-')
+
+    plt.show()
+
+
+def four_ifa():
+    snp_file = './resource/4Port_IFA_Free_Space.s4p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(snp_file)
+    # z0 = 50
+    # s_data = (z_data-z0) / (z_data+z0)
+    cs = freq*2j*np.pi
+    cs_all = np.logspace(5, 13, 10000)*2j*np.pi
+
+    # Fit modes separately
+    s_inf = 1
+    inf_weight = 1e6
+    s_data = np.concatenate([s_data, np.reshape(inf_weight * np.identity(n), [n, n, 1])], 2)
+    u_a, Lambda_A, vh_a, A_remain, err_norm, orig_norm = vecfit.joint_svd(s_data)
+    s_data = s_data[:, :, :-1]
+    Lambda_A = Lambda_A[:, :, :-1]
+    A_remain = A_remain[:, :, :-1]
+    A_model = s_data - A_remain
+
+
+    f_by_mode = []
+    total_bound = 0.0
+    for i in range(n):
+        s_mode = Lambda_A[i, i, :]
+        f_mode = vecfit.fit_s_auto(s_mode, cs)
+        f_by_mode.append(f_mode)
+
+    # Put the modes back to matrix
+    poles_by_mode = []
+    for i in range(n):
+        poles_by_mode.append(len(f_by_mode[i].pole))
+    pole = np.zeros([np.sum(poles_by_mode)], dtype=np.complex128)
+    residue = np.zeros([n, n, np.sum(poles_by_mode)], dtype=np.complex128)
+    const = np.zeros([n, n], dtype=np.complex128)
+    idx = 0
+    for i in range(n):
+        tmp_matrix = np.zeros([n, n], dtype=np.complex128)
+        tmp_matrix[i, i] = 1
+        pole_range = np.array(range(idx, idx+poles_by_mode[i]))
+
+        pole[pole_range] = f_by_mode[i].pole
+        for j in range(poles_by_mode[i]):
+            residue_matrix = np.dot(np.dot(u_a, f_by_mode[i].residue[j]*tmp_matrix), vh_a)
+            residue[:, :, pole_range[j]] = residue_matrix
+        const += np.dot(np.dot(u_a, f_by_mode[i].const*tmp_matrix), vh_a)
+        idx += poles_by_mode[i]
+    s_matrix = vecfit.RationalMtx(pole, residue, const)
+    s = 2j * np.pi * freq
+    s_model = s_matrix.model(s)
+
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(221)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[0, 0, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 0, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 0, :].flatten())), 'k-')
+    # ax1.plot(freq, 20 * np.log10(np.abs((s_data - s_model)[0, 0, :].flatten())), 'k--')
+
+    ax1 = fig1.add_subplot(222)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[0, 1, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 1, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 1, :].flatten())), 'k-')
+
+    ax1 = fig1.add_subplot(223)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[0, 2, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 2, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 2, :].flatten())), 'k-')
+
+    ax1 = fig1.add_subplot(224)
+    ax1.plot(freq, 20 * np.log10(np.abs(A_model[0, 3, :].flatten())), 'b-')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_data[0, 3, :].flatten())), 'r--')
+    ax1.plot(freq, 20 * np.log10(np.abs(s_model[0, 3, :].flatten())), 'k-')
+
+    plt.show()
+
+
 if __name__ == '__main__':
     # example1()
     # example2()
-    single_siw()
+    # single_siw()
     # coupled_siw_joint_svd_test()
     # coupled_dipole_joint_svd_test()
     # coupled_siw_rank_one()
     # dipole()
     # coupled_dipole()
     # skycross_antennas()
+    # two_ifa()
+    four_ifa()
 
 
