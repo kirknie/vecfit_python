@@ -6,6 +6,7 @@ Created on Sun Oct  1 23:19:55 2017
 """
 
 import numpy as np
+import copy
 from .vector_fitting import vector_fitting_rescale
 
 
@@ -52,23 +53,17 @@ def fit_s_auto(f, s):
     # loop until certain criterion is met: small error, passivity
     while n_pole <= max_pole:
         print('Modeling with {} poles...'.format(n_pole))
-        for s_dc, s_inf in [(None, -1), (None, 1), (-1, None), (1, None)]:
-            f_model = fit_s(f, s, n_pole, n_iter, s_dc, s_inf)  # do not put weight yet
-
-            # check error
-            error_limit = 10**(-20/20)
-            small_error = np.linalg.norm(f_model.model(s) - f, np.inf) < error_limit
-            s_all = np.logspace(np.log10(np.min(np.abs(s)))-3, np.log10(np.max(np.abs(s)))+3, int(1e5)) * 1j
-            passive = np.all(np.abs(f_model.model(s_all)) <= 1)
-            if small_error and passive:
+        for s_inf in [-1, 1]:
+            f_out, f_valid = fit_s_tight(f, s, n_pole, n_iter, s_inf)
+            if f_valid:
                 break
-        if small_error and passive:
+        if f_valid:
             break
         n_pole += 1
     else:
         raise RuntimeError('Fail to fit the S-parameter!')
 
-    return f_model
+    return f_out
 
 
 def fit_s_tight(f, s, n_pole=10, n_iter=10, s_inf=1):
@@ -99,9 +94,13 @@ def fit_s_tight(f, s, n_pole=10, n_iter=10, s_inf=1):
         passive = np.all(np.abs(f_model.model(s_all)) <= 1)
         ok = small_error and passive
         if i == 0 and not ok:  # if active with wt=0, stop
+            f_out = copy.copy(f_model)
+            f_valid = False
             break
         elif ok:  # if passive, increase the wt
             wt_a = wt
+            f_out = copy.copy(f_model)
+            f_valid = True
             if i == 0:
                 wt = init_wt
             elif backtrace is False:
@@ -112,6 +111,6 @@ def fit_s_tight(f, s, n_pole=10, n_iter=10, s_inf=1):
             wt_b = wt
             backtrace = True
             wt = (wt_a + wt_b) / 2
-    return f_model
+    return f_out, f_valid
 
 

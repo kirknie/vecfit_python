@@ -280,7 +280,7 @@ def dipole():
     # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1)
     # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1, bound_wt=0.3)
     # f_out = vecfit.fit_s_auto(s_data, cs)
-    f_out = vecfit.fit_s_tight(s_data, cs, n_pole=3, n_iter=20, s_inf=-1)
+    f_out, f_valid = vecfit.fit_s_tight(s_data, cs, n_pole=3, n_iter=20, s_inf=-1)
 
     # f_out = vecfit.fit_s(s_data, cs, n_pole=9, n_iter=20, s_dc=1)
 
@@ -765,10 +765,10 @@ if __name__ == '__main__':
     # coupled_siw_joint_svd_test()
     # coupled_dipole_joint_svd_test()
     # coupled_siw_rank_one()
-    dipole()
+    # dipole()
     # coupled_dipole()
     # skycross_antennas()
     # two_ifa()
-    # four_ifa()
+    four_ifa()
 
 
