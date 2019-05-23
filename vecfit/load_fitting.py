@@ -69,3 +69,49 @@ def fit_s_auto(f, s):
         raise RuntimeError('Fail to fit the S-parameter!')
 
     return f_model
+
+
+def fit_s_tight(f, s, n_pole=10, n_iter=10, s_inf=1):
+    init_wt = 0.01
+    wt_iter = 20
+    error_limit = 10 ** (-20 / 20)  # -20 dB error limit
+    s_all = np.logspace(np.log10(np.min(np.abs(s))) - 3, np.log10(np.max(np.abs(s))) + 3, int(1e5)) * 1j
+
+    # initial wt is 0
+    wt = 0.0
+    wt_a = 0.0
+    wt_b = 0.0
+    backtrace = False
+    for i in range(wt_iter):
+        if s_inf == 1:  # 1-s is bounded
+            f_model = vector_fitting_rescale(1 - f, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=wt)
+            f_model.const = 1
+            f_model.residue = -f_model.residue
+        elif s_inf == -1:  # 1+s is bounded
+            f_model = vector_fitting_rescale(1 + f, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=wt)
+            f_model.const = -1
+        else:  # not supported
+            raise RuntimeError('Does not support s_inf not +/-1!')
+
+        # check if the result is passive
+
+        small_error = np.linalg.norm(f_model.model(s) - f, np.inf) < error_limit
+        passive = np.all(np.abs(f_model.model(s_all)) <= 1)
+        ok = small_error and passive
+        if i == 0 and not ok:  # if active with wt=0, stop
+            break
+        elif ok:  # if passive, increase the wt
+            wt_a = wt
+            if i == 0:
+                wt = init_wt
+            elif backtrace is False:
+                wt *= 2
+            else:
+                wt = (wt_a + wt_b) / 2
+        elif not ok:  # if active, decrease the wt
+            wt_b = wt
+            backtrace = True
+            wt = (wt_a + wt_b) / 2
+    return f_model
+
+
