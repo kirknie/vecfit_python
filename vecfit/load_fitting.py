@@ -78,15 +78,7 @@ def fit_s_tight(f, s, n_pole=10, n_iter=10, s_inf=1):
     wt_b = 0.0
     backtrace = False
     for i in range(wt_iter):
-        if s_inf == 1:  # 1-s is bounded
-            f_model = vector_fitting_rescale(1 - f, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=wt)
-            f_model.const = 1
-            f_model.residue = -f_model.residue
-        elif s_inf == -1:  # 1+s is bounded
-            f_model = vector_fitting_rescale(1 + f, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=wt)
-            f_model.const = -1
-        else:  # not supported
-            raise RuntimeError('Does not support s_inf not +/-1!')
+        f_model = fit_s(f, s, n_pole, n_iter, s_inf=s_inf, bound_wt=wt)
 
         # check if the result is passive
 
