@@ -12,6 +12,9 @@ import skrf as rf
 from . import vector_fitting
 
 
+default_figure_size = (8, 5.5)
+
+
 class RationalFct:
     def __init__(self, pole, residue, const=None, linear=None):
         self.pole = np.array(pole)
@@ -68,25 +71,9 @@ class RationalFct:
         return f
 
     def plot(self, s, ax=None, x_scale=None, y_scale=None, **kwargs):
-        x = np.abs(s)/2/np.pi
         y = self.model(s)
-        fig = plt if ax is None else ax
-
-        plt_fct = fig.plot
-        if x_scale == 'linear':
-            plt_fct = fig.plot
-        elif x_scale == 'log':
-            plt_fct = fig.semilogx
-        if y_scale == 'linear':
-            pass
-        elif y_scale == 'db':
-            y = 20 * np.log10(np.abs(y))
-
-        plt_fct(x, y, **kwargs)
-        fig.grid(True, which='both', linestyle='--')
-        fig.set_xlabel('Frequency (Hz)')
-        fig.set_ylabel('Amplitude (dB)')
-        return fig, ax
+        ax = plot_freq_resp(s, y, ax, x_scale, y_scale, **kwargs)
+        return ax
 
     def zero(self):
         """
@@ -148,7 +135,9 @@ class RationalFct:
         return bound_integral(self.model(s), s, reflect)
 
     def plot_improved_bound(self, real_limit, imag_limit, ax=None):
-        fig = plt if ax is None else ax
+        if ax is None:
+            fig = plt.figure(figsize=default_figure_size)
+            ax = fig.add_subplot(111)
 
         sample = 2000
         x = np.linspace(-real_limit, 0, sample)
@@ -159,12 +148,14 @@ class RationalFct:
         zero = self.zero()
 
         # do the plot
-        fig.contourf(x, y, 2 - np.abs(f), [1, 2])
-        fig.plot(self.pole.real, self.pole.imag, 'x')
-        fig.plot(zero.real, zero.imag, 'o')
-        fig.axis([-real_limit, 0, -imag_limit, imag_limit])
-        fig.set_xlabel('Re{s}')
-        fig.set_ylabel('Im{s}')
+        ax.contourf(x, y, 2 - np.abs(f), [1, 2])
+        ax.plot(self.pole.real, self.pole.imag, 'x')
+        ax.plot(zero.real, zero.imag, 'o')
+        # ax.set_xlim([-real_limit, 0])
+        # ax.set_ylim([-imag_limit, imag_limit])
+        ax.axis([-real_limit, 0, -imag_limit, imag_limit])
+        ax.set_xlabel('Re{s}')
+        ax.set_ylabel('Im{s}')
 
         return s, f
 
@@ -316,7 +307,7 @@ class RationalMtx:
                 h = -other.linear
             else:
                 h -= other.linear
-        return RationalFct(p, r, d, h)
+        return RationalMtx(p, r, d, h)
 
     def model(self, s):
         s = np.array(s)
@@ -329,6 +320,11 @@ class RationalMtx:
             if self.linear is not None:
                 f[:, :, i] += si * self.linear
         return f
+
+    def plot(self, s, axs=None, x_scale=None, y_scale=None, **kwargs):
+        y = self.model(s)
+        axs = plot_freq_resp_matrix(s, y, axs, x_scale, y_scale, **kwargs)
+        return axs
 
     def is_symmetric(self):
         if self.const is not None and not np.allclose(self.const, self.const.T):
@@ -539,4 +535,52 @@ def takagi(a):
         print('Warning: The Takagi factorization result is not accurate! ')
     return s, uu
 
+
+def plot_freq_resp(s, resp, ax=None, x_scale=None, y_scale=None, **kwargs):
+    x = np.abs(s) / 2 / np.pi
+    y = resp
+
+    if ax is None:
+        fig = plt.figure(figsize=default_figure_size)
+        ax = fig.add_subplot(111)
+
+    plt_fct = ax.plot
+    if x_scale == 'linear':
+        pass
+    elif x_scale == 'log':
+        plt_fct = ax.semilogx
+    if y_scale == 'linear':
+        pass
+    elif y_scale == 'db':
+        y = 20 * np.log10(np.abs(y))
+
+    plt_fct(x, y, **kwargs)
+    ax.grid(True, which='both', linestyle='--')
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Amplitude (dB)')
+    return ax
+
+
+def plot_freq_resp_matrix(s, resp, axs=None, x_scale=None, y_scale=None, **kwargs):
+    x = np.abs(s) / 2 / np.pi
+    if np.ndim(resp) != 3:
+        raise RuntimeError('Unexpected input data structure')
+    d1 = np.size(resp, 0)
+    d2 = np.size(resp, 1)
+
+    if axs is None:
+        fig = plt.figure(figsize=default_figure_size)
+        axs = []
+        for i in range(d1 * d2):
+            axs.append(fig.add_subplot(d1, d2, i+1))
+    elif len(axs) != d1 * d2:
+        raise RuntimeError('Input data and list of ax size mismatch: {} x {} vs {}'.format(d1, d2, len(axs)))
+
+    idx = 0
+    for i in range(d1):
+        for j in range(d2):
+            y = resp[i, j, :].flatten()
+            plot_freq_resp(s, y, axs[idx], x_scale, y_scale, **kwargs)
+            idx += 1
+    return axs
 
