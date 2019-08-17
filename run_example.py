@@ -11,22 +11,6 @@ import vecfit
 import scipy.io
 
 
-def plot_matrix(x, y, y2=None):
-    fig = plt.figure()
-    ndim = np.size(y, 0)
-    idx = 1
-    for i in range(ndim):
-        for j in range(ndim):
-            plot_idx = ndim * 100 + ndim * 10 + idx
-            ax = fig.add_subplot(plot_idx)
-            ax.plot(x, 20 * np.log10(np.abs(y[i, j, :])), 'b-')
-            if y2 is not None:
-                ax.plot(x, 20 * np.log10(np.abs(y2[i, j, :])), 'r--')
-            ax.set_xlabel('Frequency (Hz)')
-            ax.set_ylabel('S{}{} Amplitude (dB)'.format(i+1, j+1))
-            idx += 1
-
-
 def example1():
     s_test = 1j * np.linspace(1, 1e5, 800)
     poles_test = [-4500,
