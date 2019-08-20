@@ -96,7 +96,7 @@ def bound_tightening(f, s):
     return f_out
 
 
-def mode_fitting(f, s):
+def mode_fitting(f, s, bound_output=False):
     wt = 1e3 * len(s)
     N = np.size(f, 0)
     A = np.concatenate([f, np.reshape(wt * np.identity(N), [N, N, 1])], 2)
@@ -121,6 +121,13 @@ def mode_fitting(f, s):
         const += sigma_model.const * np.dot(ui, vhi)
     # re-build the matrix model
     f_out = RationalMtx(pole, residue, const)
-    return f_out
+    if bound_output:
+        total_bound = 0
+        for i in range(N):
+            bound, bw = all_model[i].bound(np.inf)
+            total_bound += bound
+        return f_out, total_bound
+    else:
+        return f_out
 
 

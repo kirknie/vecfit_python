@@ -9,6 +9,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 import vecfit
 import scipy.io
+from os import makedirs
+from os.path import expanduser, exists
+
+
+def plot_save(file_name=None, fig=None, format='pdf'):
+    '''
+    Save the figures to file
+    :param file_name: Save file name.  If file name is None, save all current figures to default folder
+    :param fig: Figure to save
+    :return: None
+    '''
+    dir_name = expanduser('~/Documents/plots')
+    if not exists(dir_name):
+        makedirs(dir_name)
+
+    # save the figures
+    if fig is None:
+        for i in plt.get_fignums():
+            plt.figure(i)
+            plt.savefig('{}/Figure_{}.{}'.format(dir_name, i, format), dpi=360, format=format)
+            plt.close()
+        # fig = plt
+    else:
+        fig.savefig(file_name, dpi=360, format=format)
 
 
 def example1():
@@ -50,7 +74,6 @@ def example1():
     f_out.plot(s_test, ax=ax, y_scale='db', linestyle='--')
     (f_out-f_in).plot(s_test, ax=ax, y_scale='db', linestyle='--')
     ax.legend(['Input model', 'Output model', 'Error'])
-    plt.show()
 
 
 def example2():
@@ -95,7 +118,6 @@ def example2():
     axs = vecfit.plot_freq_resp_matrix(s_test, f_test, y_scale='db')
     f_out.plot(s_test, axs, y_scale='db', linestyle='--')
     (f_out-f_in).plot(s_test, axs, y_scale='db', linestyle='--')
-    plt.show()
 
 
 def single_siw():
@@ -119,8 +141,6 @@ def single_siw():
     f_out.plot(cs, ax=ax1, x_scale='log', y_scale='db', linestyle='--')
     vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, x_scale='log', y_scale='db', linestyle='--')
     ax2 = f_out.plot_improved_bound(1.2e10, 4e11)
-
-    plt.show()
 
 
 def coupled_siw_even_odd():
@@ -167,8 +187,6 @@ def coupled_siw_even_odd():
     vecfit.plot_freq_resp(cs, s_odd-f_odd.model(cs), ax=ax3, y_scale='db', linestyle='--')
     ax4 = f_odd.plot_improved_bound(2e10, 4e11)
 
-    plt.show()
-
 
 def coupled_siw():
     s2p_file = './resource/two_SIW_antenna_39GHz_50mil.s2p'
@@ -180,19 +198,15 @@ def coupled_siw():
     for i in range(len(freq)):
         s_z0[:, :, i] = np.matrix(z[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(np.matrix(z[:, :, i] / z0 + np.identity(n)))
 
-    s_model = vecfit.mode_fitting(s_z0, cs)
-    # bound_even, bw_even = f_even.bound(np.inf, f0=39e9)
-    # bound_error_even = f_even.bound_error(s_even, cs, reflect=np.inf)
-    # # integral_even = f_even.bound_integral(cs, reflect=np.inf)
-    # integral_even = vecfit.bound_integral(s_even, cs, np.inf)
-    # print('Even mode: bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound_even, bw_even, bound_error_even, integral_even))
+    s_model, bound = vecfit.mode_fitting(s_z0, cs, True)
+    bound_error = s_model.bound_error(s_z0, cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_z0, cs, np.inf)
+    print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
 
     # plots
     axs = vecfit.plot_freq_resp_matrix(cs, s_z0, y_scale='db')
     s_model.plot(cs, axs=axs, y_scale='db', linestyle='--')
     vecfit.plot_freq_resp_matrix(cs, s_z0-s_model.model(cs), axs=axs, y_scale='db', linestyle='--')
-
-    plt.show()
 
 
 def dipole():
@@ -215,8 +229,6 @@ def dipole():
     f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
     vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
     ax2 = f_out.plot_improved_bound(1e11, 4e10)
-
-    plt.show()
 
 
 def coupled_dipole():
@@ -246,11 +258,13 @@ def coupled_dipole():
     # s_model = vecfit.matrix_fitting_rescale(s_data, cs, n_pole=6, n_iter=20, has_const=True, has_linear=False, fixed_pole=fixed_pole)
     # s_model = s_model.rank_one()
     # s_model = vecfit.matrix_fitting_rank_one_rescale(s_data, cs, n_pole=6, n_iter=50, has_const=True, has_linear=True)
-    s_model = vecfit.mode_fitting(s_data, cs)
+    s_model, bound = vecfit.mode_fitting(s_data, cs, True)
+    bound_error = s_model.bound_error(s_data, cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
 
     axs = vecfit.plot_freq_resp_matrix(cs, s_data, y_scale='db')
     s_model.plot(cs, axs=axs, y_scale='db', linestyle='--')
-    plt.show()
 
 
 def skycross_antennas():
@@ -258,7 +272,11 @@ def skycross_antennas():
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(snp_file)
     cs = freq*2j*np.pi
 
-    s_matrix = vecfit.mode_fitting(s_data, cs)
+    s_matrix, bound = vecfit.mode_fitting(s_data, cs, True)
+    bound_error = s_matrix.bound_error(s_data, cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
+
 
     # plot per mode response
     # calculate the bound error
@@ -285,7 +303,6 @@ def skycross_antennas():
     # plot the s_matrix
     axs = vecfit.plot_freq_resp_matrix(cs, s_data, y_scale='db')
     s_matrix.plot(cs, axs=axs, y_scale='db', linestyle='--')
-    plt.show()
 
 
 def skycross_antennas_old():
@@ -449,12 +466,14 @@ def two_ifa():
     cs = freq*2j*np.pi
 
     # Fit modes separately
-    s_matrix = vecfit.mode_fitting(s_data, cs)
+    s_matrix, bound = vecfit.mode_fitting(s_data, cs, True)
+    bound_error = s_matrix.bound_error(s_data, cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
 
     # plot the s_matrix
     axs = vecfit.plot_freq_resp_matrix(cs, s_data, y_scale='db')
     s_matrix.plot(cs, axs=axs, y_scale='db', linestyle='--')
-    plt.show()
 
 
 def four_ifa():
@@ -463,12 +482,14 @@ def four_ifa():
     cs = freq*2j*np.pi
 
     # Fit modes separately
-    s_matrix = vecfit.mode_fitting(s_data, cs)
+    s_matrix, bound = vecfit.mode_fitting(s_data, cs, True)
+    bound_error = s_matrix.bound_error(s_data, cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
 
     # plot the s_matrix
     axs = vecfit.plot_freq_resp_matrix(cs, s_data, y_scale='db')
     s_matrix.plot(cs, axs=axs, y_scale='db', linestyle='--')
-    plt.show()
 
 
 if __name__ == '__main__':
@@ -476,11 +497,14 @@ if __name__ == '__main__':
     # example2()
     # single_siw()
     # coupled_siw_even_odd()
-    # coupled_siw()
+    coupled_siw()
     # dipole()
     # coupled_dipole()
     # skycross_antennas()
     # two_ifa()
-    four_ifa()
+    # four_ifa()
+
+    # plt.show()
+    plot_save()
 
 

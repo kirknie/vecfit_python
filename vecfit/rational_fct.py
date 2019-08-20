@@ -196,7 +196,16 @@ def bound_integral(gamma, s, reflect):
     :param reflect: reflection point
     :return: the integral value of the load, to be compared with the bound
     """
-    return num_integral(s.imag, f_integral(s.imag, reflect) * np.log(1/np.abs(gamma)))
+    if np.ndim(gamma) == 1:
+        return num_integral(s.imag, f_integral(s.imag, reflect) * np.log(1/np.abs(gamma)))
+    elif np.ndim(gamma) == 3:
+        n = np.size(gamma, 0)
+        n_freq = np.size(gamma, 2)
+        r = np.zeros(n_freq, dtype=np.complex128)
+        for i in range(n_freq):
+            s_sq = np.dot(np.conj(gamma[:, :, 0].T), gamma[:, :, i])
+            r[i] = np.sqrt(np.trace(s_sq) / n)
+        return num_integral(s.imag, f_integral(s.imag, reflect) * np.log(1/np.abs(r)))
 
 
 def get_z0(snp_file):
@@ -336,6 +345,43 @@ class RationalMtx:
             if not np.allclose(mtx, mtx.T):
                 return False
         return True
+
+    def bound_error(self, f, s, reflect, tau=0.3162278):
+        """
+        Calculate the bound error of the S-parameter model
+        :param f: the true S-matrix of load at s, 3D array
+        :param s: the input complex frequency
+        :param reflect: reflection point
+        :param tau: threshold for pass band
+        :return: the bound error
+        """
+        f_fit = self.model(s)
+        f_error = f_fit - f
+        # Calculate rho for matrix
+        n_freq = np.size(s)
+        sigma_error_max = np.zeros(n_freq, dtype=np.float64)
+        sigma_max = np.zeros(n_freq, dtype=np.float64)
+        sigma_min = np.zeros(n_freq, dtype=np.float64)
+        for i in range(n_freq):
+            u, sigma, vh = np.linalg.svd(f_error[:, :, i])
+            sigma_error_max[i] = sigma[0]
+            u, sigma, vh = np.linalg.svd(f[:, :, i])
+            sigma_max[i] = sigma[0]
+            sigma_min[i] = sigma[-1]
+        rho = 2 * sigma_error_max / (1 - np.power(sigma_max, 2)) * np.sqrt(1 + (np.power(sigma_max, 2) - np.power(sigma_min, 2)) / np.power(1 - sigma_max, 2))
+        int_fct = f_integral(s.imag, reflect) / 2 * np.log(1 + (1 - tau ** 2) / tau ** 2 * rho)
+        # delta_b = np.sum((int_fct[:-1] + int_fct[1:]) / 2 * (s.imag[1:] - s.imag[:-1]))
+        delta_b = num_integral(s.imag, int_fct)
+        return delta_b
+
+    def bound_integral(self, s, reflect):
+        """
+        Calculate the bound integral
+        :param s: complex frequency, 1D array
+        :param reflect: reflection point
+        :return: the integral value of the load, to be compared with the bound
+        """
+        return bound_integral(self.model(s), s, reflect)
 
     def rank_one(self):
         pole_pair = vector_fitting.pair_pole(self.pole)
