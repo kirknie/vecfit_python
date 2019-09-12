@@ -126,6 +126,9 @@ def mode_fitting(f, s, bound_output=False):
         for i in range(N):
             bound, bw = all_model[i].bound(np.inf)
             total_bound += bound
+            print('Mode {}, # poles {}, bound {:.5e}'.format(i, len(all_model[i].pole), bound))
+            all_model[i].plot_improved_bound(max(-all_model[i].pole.real)*1.2, max(all_model[i].pole.imag)*1.2)
+        total_bound /= N
         return f_out, total_bound
     else:
         return f_out
