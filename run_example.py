@@ -231,6 +231,28 @@ def dipole():
     ax2 = f_out.plot_improved_bound(1e11, 4e10)
 
 
+def short_dipole():
+    s1p_file = './resource/short_dipole_data.s1p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
+    cs = freq*2j*np.pi
+
+    # Try to fit S
+    f_out = vecfit.fit_s(s_data, cs, n_pole=1, n_iter=20, s_dc=1)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1, bound_wt=0.3)
+    # f_out = vecfit.bound_tightening(s_data, cs)
+
+    bound, bw = f_out.bound(np.inf, f0=2.4e9)
+    bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+    # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
+
+    ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+    vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
+    ax2 = f_out.plot_improved_bound(1e11, 4e10)
+
+
 def coupled_dipole():
     s2p_file = './resource/coupled_dipoles.s2p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s2p_file)
@@ -497,14 +519,15 @@ if __name__ == '__main__':
     # example2()
     # single_siw()
     # coupled_siw_even_odd()
-    coupled_siw()
+    # coupled_siw()
     # dipole()
+    short_dipole()
     # coupled_dipole()
     # skycross_antennas()
     # two_ifa()
     # four_ifa()
 
-    # plt.show()
-    plot_save()
+    plt.show()
+    # plot_save()
 
 

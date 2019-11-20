@@ -22,7 +22,7 @@ def init_pole(w, n_pole):
     if n_pole == 0:
         pole = np.array([])
     elif n_pole == 1:
-        pole = np.array(-loss_ratio*w)
+        pole = np.array([-loss_ratio*w])
     elif n_pole == 2:
         pole = w * np.array([-loss_ratio-1j, -loss_ratio+1j])
     elif n_pole == 3:
