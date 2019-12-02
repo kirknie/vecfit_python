@@ -58,7 +58,7 @@ def bound_tightening(f, s):
     s_all = np.logspace(np.log10(np.min(np.abs(s))) - 3, np.log10(np.max(np.abs(s))) + 3, int(1e5)) * 1j
     f_out = None
 
-    for n_pole in range(2, n_pole_max+1):
+    for n_pole in range(1, n_pole_max+1):
         for s_inf in [-1, 1]:
             # initial wt is 0
             wt = 0.0

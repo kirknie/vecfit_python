@@ -236,21 +236,58 @@ def short_dipole():
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
     cs = freq*2j*np.pi
 
-    # Try to fit S
-    f_out = vecfit.fit_s(s_data, cs, n_pole=1, n_iter=20, s_dc=1)
-    # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1, bound_wt=0.3)
-    # f_out = vecfit.bound_tightening(s_data, cs)
+    # Fit S in two ways
+    z0 = 50  # 50 Ohm
+    f0 = 2.4e9  # 2.4 GHz
+    # Model 1: C // R
+    s_model_1 = vecfit.bound_tightening(s_data, cs)
+    # z = r / (2*s - r - 2*p)
+    z_modle_1 = vecfit.RationalFct([(s_model_1.residue[0] + 2*s_model_1.pole[0]) / 2], [s_model_1.residue[0] / 2], 0, 0)
+    C = 2 / (s_model_1.residue[0] * z0)
+    R = s_model_1.residue[0] * z0 / (-s_model_1.residue[0] - 2*s_model_1.pole[0])
+    print('Model 1: C // R, C = {:.5e}, R = {:.5e}'.format(C.real, R.real))
+    # model_1_resp = (z_modle_1.model(cs) - 1) / (z_modle_1.model(cs) + 1)
 
-    bound, bw = f_out.bound(np.inf, f0=2.4e9)
-    bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
-    # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
-    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
-    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
+    # Model 2: R1 + C // R2, approximately R1 + C
+    s_model_2 = vecfit.fit_s(s_data, cs, n_pole=1, n_iter=20, s_dc=1)
+    # z = ((1+d)*s + r - (1+d)*p) / ((1-d)*s - r - (1-d)*p) = (a*s + b) / (c*s + d)
+    a = 1 + s_model_2.const
+    b = s_model_2.residue[0] - (1 + s_model_2.const) * s_model_2.pole[0]
+    c = 1 - s_model_2.const
+    d = -s_model_2.residue[0] - (1 - s_model_2.const) * s_model_2.pole[0]  # d is a small negative number, set to 0
+    z_modle_2 = vecfit.RationalFct([0], [(b - a*d/c) / c], a / c, 0)
+    R1 = a / c * z0
+    tmp = b - a*d/c
+    C = c / (tmp * z0)
+    R2 = tmp * z0 / d  # negative
+    print('Model 2: R1 + C, R1 = {:.5e}, C = {:.5e}'.format(R1.real, C.real))
+    # model_2_resp = (z_modle_2.model(cs) - 1) / (z_modle_2.model(cs) + 1)
+
+    # Textbook model: R + C
+    R = 20 * np.pi**2 * (1/20)**2
+    C = np.pi / (4e-7 * np.pi * 3e8**2) * (3e8 / 2.4e9 / 20 / 2) / (np.log(25) - 1)
+    z_modle_3 = vecfit.RationalFct([0], [1 / C / z0], R / z0, 0)
+    s_model_3 = 0
+    model_3_resp = (z_modle_3.model(cs) - 1) / (z_modle_3.model(cs) + 1)
+    print('Model 3: R + C, R = {:.5e}, C = {:.5e}'.format(R.real, C.real))
+
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=1, n_iter=20, s_dc=1)
+    # f_out = vecfit.bound_tightening(s_data, cs)
+    # bound, bw = f_out.bound(np.inf, f0=2.4e9)
+    # bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+    # # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
+    # ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    # print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
 
     ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
-    f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
-    vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
-    ax2 = f_out.plot_improved_bound(1e11, 4e10)
+    s_model_1.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+    s_model_2.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+    # s_model_3.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+    vecfit.plot_freq_resp(cs, model_3_resp, ax=ax1, y_scale='db', linestyle='--')
+
+    # vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
+    # ax2 = f_out.plot_improved_bound(1e11, 4e10)
+    ax1.legend(['Simulation', 'Auto fitting', 'Manual fitting', 'Textbook'])
 
 
 def coupled_dipole():
