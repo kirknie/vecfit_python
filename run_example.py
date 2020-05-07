@@ -241,6 +241,7 @@ def short_dipole():
     f0 = 2.4e9  # 2.4 GHz
     # Model 1: C // R
     s_model_1 = vecfit.bound_tightening(s_data, cs)
+    b1 = s_model_1.bound(0)
     # z = r / (2*s - r - 2*p)
     z_modle_1 = vecfit.RationalFct([(s_model_1.residue[0] + 2*s_model_1.pole[0]) / 2], [s_model_1.residue[0] / 2], 0, 0)
     C = 2 / (s_model_1.residue[0] * z0)
@@ -250,6 +251,7 @@ def short_dipole():
 
     # Model 2: R1 + C // R2, approximately R1 + C
     s_model_2 = vecfit.fit_s(s_data, cs, n_pole=1, n_iter=20, s_dc=1)
+    b2 = s_model_2.bound(0)
     # z = ((1+d)*s + r - (1+d)*p) / ((1-d)*s - r - (1-d)*p) = (a*s + b) / (c*s + d)
     a = 1 + s_model_2.const
     b = s_model_2.residue[0] - (1 + s_model_2.const) * s_model_2.pole[0]

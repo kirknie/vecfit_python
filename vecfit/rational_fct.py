@@ -85,6 +85,31 @@ class RationalFct:
         else:
             raise RuntimeError('Do not have a constant term')
 
+    def inverse_freq(self):
+        mask0 = None
+        h0 = None
+        if 0 in self.pole:
+            mask0 = (self.pole == 0)
+            if np.sum(mask0) > 1:
+                raise RuntimeError('Model has duplicated poles at 0')
+            h0 = self.residue[mask0][0]
+        if mask0 is None:
+            p = self.pole
+            r = self.residue
+        else:
+            p = self.pole[~mask0]
+            r = self.residue[~mask0]
+        d = 0 if self.const is None else self.const
+
+        # Construct the new model
+        p0 = 1 / p
+        r0 = -r / np.power(p, 2)
+        d0 = d - np.sum(r / p)
+        if self.linear is not None and self.linear != 0:
+            p0 = np.concatenate([np.array([0]), p0])
+            r0 = np.concatenate([np.array([self.linear]), r0])
+        return RationalFct(p0, r0, d0, h0)
+
     def bound(self, reflect, tau=0.3162278, f0=0):
         """
         Calculate the bound and maximum bandwidth of the S-parameter model
