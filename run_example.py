@@ -11,6 +11,7 @@ import vecfit
 import scipy.io
 from os import makedirs
 from os.path import expanduser, exists
+import cmath
 
 
 def plot_save(file_name=None, fig=None, format='pdf'):
@@ -231,6 +232,57 @@ def dipole():
     ax2 = f_out.plot_improved_bound(1e11, 4e10)
 
 
+def dipole_paper():
+    # Equivalent circuit of a dipole antenna using frequency-independent lumped elements
+    # https://ieeexplore.ieee.org/document/210122
+
+    s1p_file = './resource/single_dipole.s1p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
+    cs = freq*2j*np.pi
+    z0 = 50
+
+    # [2] three-element
+    # [3] four-element
+    # proposed four-element: C1 + (C2 // L1 // R1)
+    h = 62.5e-3/2
+    a = 2.5e-3/2
+    # h = 0.9
+    # a = 0.00264
+    C1 = 12.0674 * h / (np.log10(2 * h / a) - 0.7245) * 1e-12 # pF
+    C2 = 2 * h * (0.89075 / (np.power(np.log10(2 * h / a), 0.8006) - 0.861) - 0.02541) * 1e-12 # pF
+    L1 = 0.2 * h * (np.power(1.4813 * np.log10(2 * h / a), 1.012) - 0.6188) * 1e-6 # uH
+    R1 = (0.41288 * np.power(np.log10(2 * h / a), 2) + 7.40754 * np.power(2 * h / a, -0.02389) - 7.27408) * 1e3 # k Ohm
+
+    C1 *= z0
+    C2 *= z0
+    L1 /= z0
+    R1 /= z0
+    p1 = (-1/R1/C2 + cmath.sqrt(1/R1**2/C2**2 - 4/L1/C2)) / 2
+    p2 = (-1/R1/C2 - cmath.sqrt(1/R1**2/C2**2 - 4/L1/C2)) / 2
+    r1 = 1/C2 / (1 - p2/p1)
+    r2 = 1/C2 / (1 - p1/p2)
+    pole_model = [0, p1, p2]
+    zero_model = [1 / C1, r1, r2]
+    z_model = vecfit.RationalFct(pole_model, zero_model, 0, 0)
+    s_model = (z_model.model(cs) - 1) / (z_model.model(cs) + 1)
+
+    # Try to fit S
+    f_out = vecfit.bound_tightening(s_data, cs)
+
+    bound, bw = f_out.bound(np.inf, f0=2.4e9)
+    bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+    # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
+
+    ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+    vecfit.plot_freq_resp(cs, s_model, ax=ax1, y_scale='db')
+    vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
+    vecfit.plot_freq_resp(cs, s_data-s_model, ax=ax1, y_scale='db', linestyle='--')
+    ax2 = f_out.plot_improved_bound(1e11, 4e10)
+
+
 def short_dipole():
     s1p_file = './resource/short_dipole_data.s1p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
@@ -243,11 +295,11 @@ def short_dipole():
     s_model_1 = vecfit.bound_tightening(s_data, cs)
     b1 = s_model_1.bound(0)
     # z = r / (2*s - r - 2*p)
-    z_modle_1 = vecfit.RationalFct([(s_model_1.residue[0] + 2*s_model_1.pole[0]) / 2], [s_model_1.residue[0] / 2], 0, 0)
+    z_model_1 = vecfit.RationalFct([(s_model_1.residue[0] + 2*s_model_1.pole[0]) / 2], [s_model_1.residue[0] / 2], 0, 0)
     C = 2 / (s_model_1.residue[0] * z0)
     R = s_model_1.residue[0] * z0 / (-s_model_1.residue[0] - 2*s_model_1.pole[0])
     print('Model 1: C // R, C = {:.5e}, R = {:.5e}'.format(C.real, R.real))
-    # model_1_resp = (z_modle_1.model(cs) - 1) / (z_modle_1.model(cs) + 1)
+    # model_1_resp = (z_model_1.model(cs) - 1) / (z_model_1.model(cs) + 1)
 
     # Model 2: R1 + C // R2, approximately R1 + C
     s_model_2 = vecfit.fit_s(s_data, cs, n_pole=1, n_iter=20, s_dc=1)
@@ -257,20 +309,20 @@ def short_dipole():
     b = s_model_2.residue[0] - (1 + s_model_2.const) * s_model_2.pole[0]
     c = 1 - s_model_2.const
     d = -s_model_2.residue[0] - (1 - s_model_2.const) * s_model_2.pole[0]  # d is a small negative number, set to 0
-    z_modle_2 = vecfit.RationalFct([0], [(b - a*d/c) / c], a / c, 0)
+    z_model_2 = vecfit.RationalFct([0], [(b - a*d/c) / c], a / c, 0)
     R1 = a / c * z0
     tmp = b - a*d/c
     C = c / (tmp * z0)
     R2 = tmp * z0 / d  # negative
     print('Model 2: R1 + C, R1 = {:.5e}, C = {:.5e}'.format(R1.real, C.real))
-    # model_2_resp = (z_modle_2.model(cs) - 1) / (z_modle_2.model(cs) + 1)
+    # model_2_resp = (z_model_2.model(cs) - 1) / (z_model_2.model(cs) + 1)
 
     # Textbook model: R + C
     R = 20 * np.pi**2 * (1/20)**2
     C = np.pi / (4e-7 * np.pi * 3e8**2) * (3e8 / 2.4e9 / 20 / 2) / (np.log(25) - 1)
-    z_modle_3 = vecfit.RationalFct([0], [1 / C / z0], R / z0, 0)
+    z_model_3 = vecfit.RationalFct([0], [1 / C / z0], R / z0, 0)
     s_model_3 = 0
-    model_3_resp = (z_modle_3.model(cs) - 1) / (z_modle_3.model(cs) + 1)
+    model_3_resp = (z_model_3.model(cs) - 1) / (z_model_3.model(cs) + 1)
     print('Model 3: R + C, R = {:.5e}, C = {:.5e}'.format(R.real, C.real))
 
     # f_out = vecfit.fit_s(s_data, cs, n_pole=1, n_iter=20, s_dc=1)
@@ -560,7 +612,8 @@ if __name__ == '__main__':
     # coupled_siw_even_odd()
     # coupled_siw()
     # dipole()
-    short_dipole()
+    dipole_paper()
+    # short_dipole()
     # coupled_dipole()
     # skycross_antennas()
     # two_ifa()
