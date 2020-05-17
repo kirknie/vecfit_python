@@ -283,6 +283,59 @@ def dipole_paper():
     ax2 = f_out.plot_improved_bound(1e11, 4e10)
 
 
+def dipole_bound_vs_pole():
+    s1p_file = './resource/single_dipole.s1p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
+    cs = freq*2j*np.pi
+
+    # Try to fit S
+    # f_out = vecfit.bound_tightening(s_data, cs)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    pole_list = []
+    bound_list = []
+    bound_error_list = []
+    for i in range(1, 20):
+        f_out = vecfit.fit_s(s_data, cs, n_pole=i, n_iter=20, s_inf=-1)
+        bound, bw = f_out.bound(np.inf, f0=2.4e9)
+        bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+        pole_list.append(i)
+        bound_list.append(bound)
+        bound_error_list.append(bound_error)
+        f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+        vecfit.plot_freq_resp(cs, s_data - f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
+
+    # ax2 = f_out.plot_improved_bound(1e11, 4e10)
+    fig = plt.figure(figsize=(8, 5.5))
+    ax = fig.add_subplot(111)
+    ax.plot(pole_list, np.array(bound_list) + np.array(bound_error_list))
+    ax.plot(pole_list, bound_list, '--')
+    ax.plot(pole_list, bound_error_list, '--')
+    # plt.show()
+
+    ax2 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    pole_list = []
+    bound_list = []
+    bound_error_list = []
+    for i in range(1, 20):
+        f_out = vecfit.fit_s(s_data, cs, n_pole=i, n_iter=20, s_dc=1)
+        bound, bw = f_out.bound(0, f0=2.4e9)
+        bound_error = f_out.bound_error(s_data, cs, reflect=0)
+        pole_list.append(i)
+        bound_list.append(bound)
+        bound_error_list.append(bound_error)
+        f_out.plot(cs, ax=ax2, y_scale='db', linestyle='--')
+        vecfit.plot_freq_resp(cs, s_data - f_out.model(cs), ax=ax2, y_scale='db', linestyle='--')
+
+    # ax2 = f_out.plot_improved_bound(1e11, 4e10)
+    fig = plt.figure(figsize=(8, 5.5))
+    ax = fig.add_subplot(111)
+    ax.plot(pole_list, np.array(bound_list) + np.array(bound_error_list))
+    ax.plot(pole_list, bound_list, '--')
+    ax.plot(pole_list, bound_error_list, '--')
+    plt.show()
+
+
 def short_dipole():
     s1p_file = './resource/short_dipole_data.s1p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
@@ -612,7 +665,7 @@ if __name__ == '__main__':
     # coupled_siw_even_odd()
     # coupled_siw()
     # dipole()
-    dipole_paper()
+    dipole_bound_vs_pole()
     # short_dipole()
     # coupled_dipole()
     # skycross_antennas()
