@@ -61,9 +61,9 @@ def fit_s(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
     return f_model
 
 
-def bound_tightening(f, s):
+def bound_tightening(f, s, err=-20):
     n_pole_max = 50
-    error_limit = 10 ** (-20 / 20)  # -20 dB error limit
+    error_limit = 10 ** (err / 20)  # -20 dB error limit
     norm_order = np.inf
     n_iter = 20  # Number of iterations for fitting
     wt_iter = 20  # Number of iterations for weight updating

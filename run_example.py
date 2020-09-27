@@ -520,6 +520,31 @@ def short_dipole():
     ax1.legend(['Simulation', 'Auto fitting', 'Manual fitting', 'Textbook'])
 
 
+def short_dipole_0():
+    s1p_file = './resource/short_dipole_data.s1p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
+    cs = freq*2j*np.pi
+
+    # Fit S in two ways
+    z0 = 50  # 50 Ohm
+    f0 = 2.4e9  # 2.4 GHz
+    s_data_0 = (np.flip(s_data, 0)).conj()
+    cs_0 = (1 / np.flip(cs, 0)).conj()
+    s_model_1 = vecfit.bound_tightening(s_data_0, cs_0, err=-60)  # need to set the error limit to -60 for short dipole
+    # Need to change 1/s to s
+    p0 = 1 / s_model_1.pole
+    r0 = -s_model_1.residue / np.power(s_model_1.pole, 2)
+    d0 = s_model_1.model([0])[0]
+    # d0 = s_model_1.const - np.sum(s_model_1.residue / s_model_1.pole)
+    # s_model_2 = vecfit.RationalFct(p0, r0, d0, 0)
+    s_model_2 = s_model_1.inverse_freq()
+
+    ax1 = vecfit.plot_freq_resp(cs_0, s_data_0, y_scale='db')
+    s_model_1.plot(cs_0, ax=ax1, y_scale='db', linestyle='--')
+    ax2 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    s_model_2.plot(cs, ax=ax2, y_scale='db', linestyle='--')
+
+
 def coupled_dipole():
     s2p_file = './resource/coupled_dipoles.s2p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s2p_file)
@@ -788,6 +813,7 @@ if __name__ == '__main__':
     # coupled_siw_even_odd()
     # coupled_siw()
     transmission_line_model()
+    # short_dipole_0()
     # dipole()
     # dipole_bound_vs_pole()
     # long_dipole_paper()
