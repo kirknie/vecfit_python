@@ -12,6 +12,8 @@ import scipy.io
 from os import makedirs
 from os.path import expanduser, exists
 import cmath
+from scipy.interpolate import interp1d
+from scipy import optimize
 
 
 def plot_save(file_name=None, fig=None, format='pdf'):
@@ -208,6 +210,43 @@ def coupled_siw():
     axs = vecfit.plot_freq_resp_matrix(cs, s_z0, y_scale='db')
     s_model.plot(cs, axs=axs, y_scale='db', linestyle='--')
     vecfit.plot_freq_resp_matrix(cs, s_z0-s_model.model(cs), axs=axs, y_scale='db', linestyle='--')
+
+
+def transmission_line_model():
+    # load: r // c + l
+    r = 55
+    l = 5e-9
+    c = 1e-12
+
+    # z0 = sqrt(l0 / c0) = 50 Ohm
+    z0 = 50
+    c0 = 1e-12
+    l0 = 2.5e-9
+    n = 9  # number of stages
+
+    freq = np.linspace(1e9, 5e9, 1000)
+    cs = freq*2j*np.pi
+    zl = 1 / (c * cs + 1/r) + l * cs
+    for i in range(n):
+        zl = zl + l0 * cs
+        zl = 1 / (c0 * cs + 1/zl)
+    sl = (zl - z0) / (zl + z0)
+    s_data = sl
+
+    # Try to fit S
+    f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
+    # f_out = vecfit.bound_tightening(s_data, cs)
+
+    bound, bw = f_out.bound(np.inf, f0=2.4e9)
+    bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+    # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
+
+    ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+    vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
+    ax2 = f_out.plot_improved_bound(1e11, 4e10)
 
 
 def dipole():
@@ -664,8 +703,11 @@ if __name__ == '__main__':
     # single_siw()
     # coupled_siw_even_odd()
     # coupled_siw()
+    transmission_line_model()
     # dipole()
-    dipole_bound_vs_pole()
+    # dipole_bound_vs_pole()
+    # long_dipole_paper()
+    # long_dipole_bound_vs_pole()
     # short_dipole()
     # coupled_dipole()
     # skycross_antennas()
