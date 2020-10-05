@@ -628,7 +628,8 @@ def plot_freq_resp(s, resp, ax=None, x_scale=None, y_scale=None, **kwargs):
     plt_fct(x, y, **kwargs)
     ax.grid(True, which='both', linestyle='--')
     ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('Amplitude (dB)')
+    if y_scale == 'db':
+        ax.set_ylabel('Amplitude (dB)')
     return ax
 
 

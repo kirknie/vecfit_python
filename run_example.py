@@ -14,6 +14,39 @@ from os.path import expanduser, exists
 import cmath
 from scipy.interpolate import interp1d
 from scipy import optimize
+import copy
+
+
+tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
+             (44, 160, 44), (152, 223, 138), (214, 39, 40), (255, 152, 150),
+             (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),
+             (227, 119, 194), (247, 182, 210), (127, 127, 127), (199, 199, 199),
+             (188, 189, 34), (219, 219, 141), (23, 190, 207), (158, 218, 229)]
+
+tableau10 = tableau20[0::2]
+tableau10_light = tableau20[1::2]
+
+
+def colors(i, j=None):
+    all_color = tableau10 + tableau10_light
+    all_color = [(r/255, g/255, b/255) for r, g, b in all_color]
+
+    if isinstance(i, list):
+        return [colors(idx) for idx in i]
+
+    i = i % len(all_color)
+    if j is not None:
+        # return a list of j colors
+        if j <= len(all_color[i:]):
+            return all_color[i:i+j]
+        else:
+            return_color = all_color[i:]
+            while j - len(return_color) > len(all_color):
+                return_color = return_color + all_color
+            return_color = return_color + all_color[:j-len(return_color)]
+            return return_color
+    else:
+        return all_color[i]
 
 
 def plot_save(file_name=None, fig=None, format='pdf'):
@@ -214,7 +247,7 @@ def coupled_siw():
 
 def transmission_line_model():
     # load: r // c + l
-    r = 55
+    r = 60
     l = 5e-9
     c = 1e-12
 
@@ -224,7 +257,7 @@ def transmission_line_model():
     l0 = 2.5e-9
     n = 9  # number of stages
 
-    freq = np.linspace(1e9, 5e9, 1000)
+    freq = np.linspace(1e8, 3e9, 1000)
     cs = freq*2j*np.pi
     zl = 1 / (c * cs + 1/r) + l * cs
     for i in range(n):
@@ -234,19 +267,88 @@ def transmission_line_model():
     s_data = sl
 
     # Try to fit S
-    f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
-    # f_out = vecfit.bound_tightening(s_data, cs)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
+    f_out = vecfit.bound_tightening(s_data, cs)
 
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
     # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
     ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Model has {} poles'.format(f_out.pole.shape[0]))
     print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
 
     ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
     f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
     vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
     ax2 = f_out.plot_improved_bound(1e11, 4e10)
+
+
+def transmission_line_model_vs_freq_range():
+    # load: r // c + l
+    r = 60
+    l = 5e-9
+    c = 1e-12
+
+    # z0 = sqrt(l0 / c0) = 50 Ohm
+    z0 = 50
+    c0 = 1e-12
+    l0 = 2.5e-9
+    n = 9  # number of stages
+
+    # start freq 0.1 GHz, end freq 2/3/4/5 GHz
+    f1 = 1e8
+    f2_list = [2e9, 3e9, 4e9, 5e9]
+    bound_list = []
+    bound_error_list = []
+    f_out_list = []
+    pole_num_list = []
+    for f2 in f2_list:
+        freq = np.linspace(f1, f2, 1000)
+        cs = freq*2j*np.pi
+        zl = 1 / (c * cs + 1/r) + l * cs
+        for i in range(n):
+            zl = zl + l0 * cs
+            zl = 1 / (c0 * cs + 1 / zl)
+        sl = (zl - z0) / (zl + z0)
+        s_data = sl
+
+        # Try to fit S
+        # f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
+        f_out = vecfit.bound_tightening(s_data, cs)
+
+        bound, bw = f_out.bound(np.inf, f0=2.4e9)
+        bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+
+        f_out_list.append(f_out)
+        bound_list.append(bound)
+        bound_error_list.append(bound_error)
+        pole_num_list.append(f_out.pole.shape[0])
+
+    fig = plt.figure(figsize=(8, 5.5))
+    ax1 = fig.add_subplot(111)
+    vecfit.plot_freq_resp(cs, s_data, ax=ax1, y_scale='db', color=colors(0))
+    i = 1
+    for f_out, f2 in zip(f_out_list, f2_list):
+        f_band = copy.copy(freq)
+        f_band[freq > f2] = np.nan
+        cs = f_band*2j*np.pi
+        f_out.plot(cs, ax=ax1, y_scale='db', color=colors(i))
+        vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--', color=colors(i))
+        i += 1
+    legend_text = ['S-param data']
+    for i, pole_num in enumerate(pole_num_list):
+        legend_text += ['Model {} ({} poles)'.format(i+1, pole_num), 'Model {} error'.format(i+1)]
+    ax1.legend(legend_text)
+    fig.savefig('/Users/dingnie/Desktop/model_vs_freq_range.pdf', dpi=360, format='pdf')
+
+    # pole vs bound
+    fig = plt.figure(figsize=(8, 5.5))
+    ax2 = fig.add_subplot(111)
+    ax2.plot(pole_num_list, np.array(bound_list) + np.array(bound_error_list))
+    ax2.plot(pole_num_list, bound_list, '--')
+    ax2.plot(pole_num_list, bound_error_list, '--')
+    ax2.legend([r'$B+\delta B$', r'$B$', r'$\delta B$'])
+    fig.savefig('/Users/dingnie/Desktop/circuit_bound_vs_poles.pdf', dpi=360, format='pdf')
 
 
 def dipole():
@@ -320,6 +422,93 @@ def dipole_paper():
     vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
     vecfit.plot_freq_resp(cs, s_data-s_model, ax=ax1, y_scale='db', linestyle='--')
     ax2 = f_out.plot_improved_bound(1e11, 4e10)
+
+
+def long_dipole_paper():
+    s1p_file = './resource/single_dipole_wideband.s1p'
+    freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
+    cs = freq*2j*np.pi
+    z0 = 50
+    z_data = (1 + s_data) / (1 - s_data) * z0
+    fz = interp1d(freq, z_data)
+    fr = interp1d(freq, np.real(z_data))
+    fx = interp1d(freq, np.imag(z_data))
+    f0 = 2.4e9
+    f1 = optimize.bisect(fx, 2e9, 2.5e9)
+    f2 = optimize.bisect(fx, 4e9, 4.2e9)
+    f3 = optimize.bisect(fx, 6.8e9, 7.2e9)
+    f4 = optimize.bisect(fx, 8.5e9, 8.8e9)
+
+    # Equivalent circuit of dipole antenna of arbitrary length
+    # proposed structure: C0 + L0 + (R1 // L1 // C1) + (R2 // L2 // C2)
+    C0 = -1 / (2 * np.pi * f0/10 * fx(f0/10))  # determined by 0.1 * lambda
+    L0 = 1 / (2 * np.pi * (3*f1)) ** 2 / C0  # determined by 0.5 * lambda and C0
+    R1 = fr(f2)  # determined by 1 * lambda
+    C1 = 1e-13  # determined by 0.5 * lambda and 1 * lambda
+    L1 = 1 / (2 * np.pi * f2) ** 2 / C1  # determined by 0.5 * lambda and 1 * lambda
+    R2 = fr(f4)  # determined by 2 * lambda
+    C2 = 1.2e-13  # determined by 1.5 * lambda and 2 * lambda
+    L2 = 1 / (2 * np.pi * (1.018*f4)) ** 2 / C2  # determined by 1.5 * lambda and 2 * lambda
+
+    p1 = (-1/R1/C1 + cmath.sqrt(1/R1**2/C1**2 - 4/L1/C1)) / 2
+    p2 = (-1/R1/C1 - cmath.sqrt(1/R1**2/C1**2 - 4/L1/C1)) / 2
+    r1 = 1/C1 / (1 - p2/p1)
+    r2 = 1/C1 / (1 - p1/p2)
+    p3 = (-1/R2/C2 + cmath.sqrt(1/R2**2/C2**2 - 4/L2/C2)) / 2
+    p4 = (-1/R2/C2 - cmath.sqrt(1/R2**2/C2**2 - 4/L2/C2)) / 2
+    r3 = 1/C2 / (1 - p4/p3)
+    r4 = 1/C2 / (1 - p3/p4)
+    pole_model = [0, p1, p2, p3, p4]
+    zero_model = [1 / C0, r1, r2, r3, r4]
+    z_model = vecfit.RationalFct(pole_model, zero_model, 0, L0)
+    s_model = (z_model.model(cs) - z0) / (z_model.model(cs) + z0)
+
+    # zl = z_model.model(cs)
+    # rl = zl.real
+    # xl = zl.imag
+    # ax1 = vecfit.plot_freq_resp(cs, rl)
+    # vecfit.plot_freq_resp(cs, xl, ax=ax1)
+
+    zl2 = 1/(cs*C0) + cs*L0 + 1/(1/R1 + 1/(cs*L1) + cs*C1) + 1/(1/R2 + 1/(cs*L2) + cs*C2)
+    # zl2 = 1/(cs*C0) + cs*L0 + 1/(1/R1 + 1/(cs*L1) + cs*C1)
+    # zl2 = 1/(cs*C0) + cs*L0
+    # zl2 = 1/(1/R1 + 1/(cs*L1) + cs*C1)
+    rl2 = zl2.real
+    xl2 = zl2.imag
+    ax2 = vecfit.plot_freq_resp(cs, rl2)
+    vecfit.plot_freq_resp(cs, xl2, ax=ax2)
+
+    rl3 = z_data.real
+    xl3 = z_data.imag
+    ax3 = vecfit.plot_freq_resp(cs, rl3)
+    vecfit.plot_freq_resp(cs, rl2, ax=ax3, linestyle='--')
+    vecfit.plot_freq_resp(cs, xl3, ax=ax3)
+    vecfit.plot_freq_resp(cs, xl2, ax=ax3, linestyle='--')
+
+    # Use algorithm to fit S
+    f_out = vecfit.bound_tightening(s_data, cs)
+    z_fit = (1 + f_out.model(cs)) / (1 - f_out.model(cs)) * z0
+
+    bound, bw = f_out.bound(np.inf, f0=2.4e9)
+    bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+    # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
+    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
+
+    fit_ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db', color=colors(0))
+    f_out.plot(cs, ax=fit_ax1, y_scale='db', linestyle='--', color=colors(1))
+    vecfit.plot_freq_resp(cs, s_model, ax=fit_ax1, y_scale='db', linestyle='--', color=colors(2))
+    vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=fit_ax1, y_scale='db', linestyle='-.', color=colors(1))
+    vecfit.plot_freq_resp(cs, s_data-s_model, ax=fit_ax1, y_scale='db', linestyle='-.', color=colors(2))
+
+    f_out.plot_improved_bound(3e11, 1e11)
+
+    rl4 = z_fit.real
+    xl4 = z_fit.imag
+    ax4 = vecfit.plot_freq_resp(cs, rl3)
+    vecfit.plot_freq_resp(cs, rl4, ax=ax4, linestyle='--')
+    vecfit.plot_freq_resp(cs, xl3, ax=ax4)
+    vecfit.plot_freq_resp(cs, xl4, ax=ax4, linestyle='--')
 
 
 def dipole_bound_vs_pole():
@@ -812,7 +1001,8 @@ if __name__ == '__main__':
     # single_siw()
     # coupled_siw_even_odd()
     # coupled_siw()
-    transmission_line_model()
+    # transmission_line_model()
+    transmission_line_model_vs_freq_range()
     # short_dipole_0()
     # dipole()
     # dipole_bound_vs_pole()
