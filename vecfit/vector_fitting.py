@@ -142,7 +142,8 @@ def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, 
 
 def vector_fitting_rescale(f, s, *args, **kwargs):
     s_scale = abs(s[-1])
-    f_scale = abs(f[-1])
+    # f_scale = abs(f[-1])
+    f_scale = 1  # f_scale will affect the relation between residue and zero
 
     if 'fixed_pole' in kwargs and kwargs['fixed_pole'] is not None:
         kwargs['fixed_pole'] = [p/s_scale for p in kwargs['fixed_pole']]
@@ -231,6 +232,8 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
 
     # Solve for x
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)
+
+    # we can check bound here:  bound = (np.dot(A, x) - b)[-1] * s_scale / bound_wt
 
     rk = np.complex128(x[:n_pole])
     if n_fixed == n_pole:
