@@ -94,19 +94,18 @@ def bound_tightening(f, s, err=-20):
                     wt = init_wt
                 elif start_tighten:
                     b1 = f_out.bound(0)
-                    if valid and not backtrace:
+                    if valid:
                         f_out = copy.copy(f_model)
                         wt_a = wt
-                        wt *= 2
-                    elif valid:
-                        f_out = copy.copy(f_model)
-                        wt_a = wt
-                        wt = (wt_a + wt_b) / 2
+                        if backtrace:
+                            wt = (wt_a + wt_b) / 2
+                        else:
+                            wt *= 2
                     else:
                         backtrace = True
                         wt_b = wt
                         wt = (wt_a + wt_b) / 2
-                else:  # Increase number of poles
+                else:  # not valid: change reflection or increase number of poles
                     break
             else:
                 return f_out
