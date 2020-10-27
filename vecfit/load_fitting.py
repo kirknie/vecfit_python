@@ -93,7 +93,6 @@ def bound_tightening(f, s, err=-20):
                     start_tighten = True
                     wt = init_wt
                 elif start_tighten:
-                    b1 = f_out.bound(0)
                     if valid:
                         f_out = copy.copy(f_model)
                         wt_a = wt
@@ -109,6 +108,121 @@ def bound_tightening(f, s, err=-20):
                     break
             else:
                 return f_out
+    return f_out
+
+
+def bound_tightening_sweep(f, s, s0=None, fs0=None):
+    n_pole_max = 50
+    n_iter = 20  # Number of iterations for fitting
+    wt_iter = 20  # Number of iterations for weight updating
+    init_wt = 0.01  # Weight updating initial step
+
+    s_all = np.logspace(np.log10(np.min(np.abs(s))) - 3, np.log10(np.max(np.abs(s))) + 3, int(1e5)) * 1j
+    f_out = None
+
+    reflect_list = [(-1, None), (1, None), (None, -1), (None, 1)]
+    if s0 == 0:
+        if fs0 == 1 or fs0 == -1:
+            reflect_list = [(fs0, None)]
+        else:
+            reflect_list = [(-1, None), (1, None)]
+    elif s0 is not None and np.isinf(s0):
+        if fs0 == 1 or fs0 == -1:
+            reflect_list = [(None, fs0)]
+        else:
+            reflect_list = [(None, -1), (None, 1)]
+
+    f_inf = []
+    b_inf = []
+    db_inf = []
+    wt_inf = []
+    pole_num_inf = []
+    f_zero = []
+    b_zero = []
+    db_zero = []
+    wt_zero = []
+    pole_num_zero = []
+
+    for n_pole in range(1, n_pole_max+1):
+        for s_dc, s_inf in reflect_list:
+            # initial wt is 0
+            wt = 0.0
+            wt_a = 0.0
+            wt_b = 0.0
+            start_tighten = False
+            backtrace = False
+            reflect = 0 if s_inf is None else np.inf
+            fl = []
+            bl = []
+            dbl = []
+            wtl = []
+            for i in range(wt_iter):
+                f_model = fit_s(f, s, n_pole, n_iter, s_dc, s_inf, wt)
+
+                # check if the result is passive
+                passive = np.all(np.abs(f_model.model(s_all)) <= 1)
+                valid = passive
+
+                # calculate the bound here to be used as the stopping condition
+                # test for B + delta B
+                if valid:
+                    bound, bw = f_model.bound(reflect)
+                    bound_error = f_model.bound_error(f, s, reflect=reflect)
+                    fl.append(f_model)
+                    bl.append(bound)
+                    dbl.append(bound_error)
+                    wtl.append(wt)
+
+                # search for the weight
+                if valid and not start_tighten:
+                    f_out = copy.copy(f_model)
+                    start_tighten = True
+                    wt = init_wt
+                elif start_tighten:
+                    if valid:
+                        f_out = copy.copy(f_model)
+                        wt_a = wt
+                        if backtrace:
+                            wt = (wt_a + wt_b) / 2
+                        else:
+                            wt *= 2
+                    else:
+                        backtrace = True
+                        wt_b = wt
+                        wt = (wt_a + wt_b) / 2
+                else:  # not valid: change reflection or increase number of poles
+                    break
+            if reflect == 0 and fl:
+                f_zero.append(fl)
+                b_zero.append(bl)
+                db_zero.append(dbl)
+                wt_zero.append(wtl)
+                pole_num_zero.append(n_pole)
+            elif fl:  # reflect at inf
+                f_inf.append(fl)
+                b_inf.append(bl)
+                db_inf.append(dbl)
+                wt_inf.append(wtl)
+                pole_num_inf.append(n_pole)
+        # check the exit condition here for pole loop
+        # if the B + dB is larger than the previous n loops, then break
+        n = 5
+        if len(f_zero) > n:
+            b_min = []
+            for i in range(n+1):
+                b_min.append(np.min(np.array(b_zero[-(n+1-i)]) + np.array(db_zero[-(n+1-i)])))
+            if np.argmin(np.array(b_min)) == 0:  # stop
+                f_out = f_zero[-(n+1)][np.argmin(np.array(b_zero[-(n+1)]) + np.array(db_zero[-(n+1)]))]
+                return f_out
+                # return f_out, b_zero, db_zero, wt_zero, pole_num_zero
+        elif len(f_inf) > n:
+            b_min = []
+            for i in range(n+1):
+                b_min.append(np.min(np.array(b_inf[-(n+1-i)]) + np.array(db_inf[-(n+1-i)])))
+            if np.argmin(np.array(b_min)) == 0:  # stop
+                f_out = f_inf[-(n+1)][np.argmin(np.array(b_inf[-(n+1)]) + np.array(db_inf[-(n+1)]))]
+                return f_out
+                # return f_out, b_inf, db_inf, wt_inf, pole_num_inf
     return f_out
 
 
