@@ -61,7 +61,7 @@ def fit_s(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
     return f_model
 
 
-def bound_tightening(f, s, err=-20):
+def bound_tightening(f, s, s0=None, fs0=None, err=-20):
     n_pole_max = 50
     error_limit = 10 ** (err / 20)  # -20 dB error limit
     norm_order = np.inf
@@ -72,8 +72,20 @@ def bound_tightening(f, s, err=-20):
     s_all = np.logspace(np.log10(np.min(np.abs(s))) - 3, np.log10(np.max(np.abs(s))) + 3, int(1e5)) * 1j
     f_out = None
 
+    reflect_list = [(-1, None), (1, None), (None, -1), (None, 1)]
+    if s0 == 0:
+        if fs0 == 1 or fs0 == -1:
+            reflect_list = [(fs0, None)]
+        else:
+            reflect_list = [(-1, None), (1, None)]
+    elif s0 is not None and np.isinf(s0):
+        if fs0 == 1 or fs0 == -1:
+            reflect_list = [(None, fs0)]
+        else:
+            reflect_list = [(None, -1), (None, 1)]
+
     for n_pole in range(1, n_pole_max+1):
-        for s_dc, s_inf in [(-1, None), (1, None), (None, -1), (None, 1)]:
+        for s_dc, s_inf in reflect_list:
             # initial wt is 0
             wt = 0.0
             wt_a = 0.0
@@ -87,14 +99,14 @@ def bound_tightening(f, s, err=-20):
                 small_error = np.linalg.norm(f_model.model(s) - f, norm_order) < error_limit
                 passive = np.all(np.abs(f_model.model(s_all)) <= 1)
                 valid = small_error and passive
-
-                if valid and not start_tighten:
+                if valid:
                     f_out = copy.copy(f_model)
+
+                if valid and f_model.stable and not start_tighten:
                     start_tighten = True
                     wt = init_wt
                 elif start_tighten:
-                    if valid:
-                        f_out = copy.copy(f_model)
+                    if valid and f_model.stable:
                         wt_a = wt
                         if backtrace:
                             wt = (wt_a + wt_b) / 2
@@ -162,10 +174,9 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
                 # check if the result is passive
                 passive = np.all(np.abs(f_model.model(s_all)) <= 1)
                 valid = passive
-
-                # calculate the bound here to be used as the stopping condition
-                # test for B + delta B
                 if valid:
+                    f_out = copy.copy(f_model)
+                    # calculate the B + delta B to be used as the stopping condition
                     bound, bw = f_model.bound(reflect)
                     bound_error = f_model.bound_error(f, s, reflect=reflect)
                     fl.append(f_model)
@@ -174,13 +185,11 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
                     wtl.append(wt)
 
                 # search for the weight
-                if valid and not start_tighten:
-                    f_out = copy.copy(f_model)
+                if valid and f_model.stable and not start_tighten:
                     start_tighten = True
                     wt = init_wt
                 elif start_tighten:
-                    if valid:
-                        f_out = copy.copy(f_model)
+                    if valid and f_model.stable:
                         wt_a = wt
                         if backtrace:
                             wt = (wt_a + wt_b) / 2
@@ -213,17 +222,17 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
                 b_min.append(np.min(np.array(b_zero[-(n+1-i)]) + np.array(db_zero[-(n+1-i)])))
             if np.argmin(np.array(b_min)) == 0:  # stop
                 f_out = f_zero[-(n+1)][np.argmin(np.array(b_zero[-(n+1)]) + np.array(db_zero[-(n+1)]))]
-                return f_out
-                # return f_out, b_zero, db_zero, wt_zero, pole_num_zero
+                # return f_out
+                return f_out, [b_zero, db_zero, wt_zero, pole_num_zero]
         elif len(f_inf) > n:
             b_min = []
             for i in range(n+1):
                 b_min.append(np.min(np.array(b_inf[-(n+1-i)]) + np.array(db_inf[-(n+1-i)])))
             if np.argmin(np.array(b_min)) == 0:  # stop
                 f_out = f_inf[-(n+1)][np.argmin(np.array(b_inf[-(n+1)]) + np.array(db_inf[-(n+1)]))]
-                return f_out
-                # return f_out, b_inf, db_inf, wt_inf, pole_num_inf
-    return f_out
+                # return f_out
+                return f_out, [b_inf, db_inf, wt_inf, pole_num_inf]
+    return f_out, []
 
 
 def mode_fitting(f, s, bound_output=False):

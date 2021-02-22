@@ -8,19 +8,22 @@ Created on Tue Mar 13 16:31:51 2018
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy.linalg
+import matplotlib
 import skrf as rf
 from . import vector_fitting
 
 
+matplotlib.use('TkAgg')
 default_figure_size = (8, 5.5)
 
 
 class RationalFct:
-    def __init__(self, pole, residue, const=None, linear=None):
+    def __init__(self, pole, residue, const=None, linear=None, stable=True):
         self.pole = np.array(pole)
         self.residue = np.array(residue)
         self.const = const
         self.linear = linear
+        self.stable = stable
 
     def __add__(self, other):
         p = np.concatenate([self.pole, other.pole])
@@ -37,7 +40,8 @@ class RationalFct:
                 h = other.linear
             else:
                 h += other.linear
-        return RationalFct(p, r, d, h)
+        stable = self.stable and other.stable
+        return RationalFct(p, r, d, h, stable)
 
     def __sub__(self, other):
         p = np.concatenate([self.pole, other.pole])
@@ -54,7 +58,8 @@ class RationalFct:
                 h = -other.linear
             else:
                 h -= other.linear
-        return RationalFct(p, r, d, h)
+        stable = self.stable and other.stable
+        return RationalFct(p, r, d, h, stable)
 
     def model(self, s):
         """
@@ -108,7 +113,7 @@ class RationalFct:
         if self.linear is not None and self.linear != 0:
             p0 = np.concatenate([np.array([0]), p0])
             r0 = np.concatenate([np.array([self.linear]), r0])
-        return RationalFct(p0, r0, d0, h0)
+        return RationalFct(p0, r0, d0, h0, self.stable)
 
     def bound(self, reflect, tau=0.3162278, f0=0):
         """

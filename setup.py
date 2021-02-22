@@ -16,7 +16,8 @@ setup(name='vecfit',
       license='',
       packages=['vecfit'],
       install_requires=[
-          'numpy',
-          'matplotlib',
+            'numpy',
+            'matplotlib',
+            'scikit-rf',
       ],
       zip_safe=False)

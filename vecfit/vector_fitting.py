@@ -259,7 +259,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
     if reflect_z is not None:
         dk = np.sum([-(r/(s0-p)+r/(-s0-p))/2 for p, r in zip(fk.pole, rk)])
 
-    return RationalFct(pk, rk, dk, hk)
+    return RationalFct(pk, rk, dk, hk, ~np.any(unstable))
 
 
 def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
@@ -337,5 +337,5 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
     if reflect_z is not None:
         dk = np.sum([-(r/(s0-p)+r/(-s0-p))/2 for p, r in zip(fk.pole, rk)])
 
-    return RationalFct(fk.pole, rk, dk, hk)
+    return RationalFct(fk.pole, rk, dk, hk, fk.stable)
 
