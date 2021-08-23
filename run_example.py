@@ -6,6 +6,7 @@ Created on Sun Oct  1 15:27:46 2017
 """
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import vecfit
 import scipy.io
@@ -17,6 +18,30 @@ from scipy import optimize
 import copy
 
 
+default_figure_size = (8, 5.5)
+
+# Thin lines
+thin_linewidth = 0.5
+thin_markersize = 3
+# Medium lines
+medium_linewidth = 1
+medium_markersize = 5
+# Thick lines
+thick_linewidth = 1.5
+thick_markersize = 5
+
+default_linewidth = medium_linewidth
+default_markersize = medium_markersize
+default_barwidth = 0.8
+default_alpha = 0.3
+default_grid_linewidth = 0.5
+default_grid_style = '--'
+default_grid_color = '#b0b0b0'
+default_font_size = 12
+default_font_size_major = 'medium'
+# number or {'xx-small', 'x-small', 'smaller', 'small', 'medium', 'large', 'larger', 'x-large', 'xx-large'}
+default_tick_direction = 'in'
+
 tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
              (44, 160, 44), (152, 223, 138), (214, 39, 40), (255, 152, 150),
              (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),
@@ -26,6 +51,26 @@ tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
 tableau10 = tableau20[0::2]
 tableau10_light = tableau20[1::2]
 
+matplotlib.rcParams['font.family'] = 'Times New Roman'
+matplotlib.rcParams['mathtext.fontset'] = 'stix'
+matplotlib.rcParams['font.size'] = default_font_size
+if 'SFHello-Light' in matplotlib.rcParams['font.family'] or 'SFHello-Regular' in matplotlib.rcParams['font.family']:
+    # This is required to embed SF Hello fonts to pdf, the pdf size will be big though
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
+# we may use a larger font size for some major information
+matplotlib.rcParams['figure.titlesize'] = default_font_size_major
+matplotlib.rcParams['axes.titlesize'] = default_font_size_major
+matplotlib.rcParams['axes.labelsize'] = default_font_size_major
+matplotlib.rcParams['xtick.labelsize'] = default_font_size_major
+matplotlib.rcParams['ytick.labelsize'] = default_font_size_major
+matplotlib.rcParams['xtick.direction'] = default_tick_direction
+matplotlib.rcParams['ytick.direction'] = default_tick_direction
+matplotlib.rcParams['grid.color'] = default_grid_color
+matplotlib.rcParams['grid.linestyle'] = default_grid_style
+matplotlib.rcParams['grid.linewidth'] = default_grid_linewidth
+matplotlib.rcParams['lines.linewidth'] = default_linewidth
+matplotlib.rcParams['patch.linewidth'] = default_grid_linewidth  # use this to control the linewidth of smith chart
 
 def colors(i, j=None):
     all_color = tableau10 + tableau10_light
