@@ -17,6 +17,45 @@ def fit_z(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pol
     return f_model
 
 
+# def fit_z_tight(f, s, n_pole=10, n_iter=10, z_dc=None, z_inf=None, bound_wt_z=None):
+def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
+    fz = (1 + f) / (1 - f)
+    # Call vector_fitting function and do some post processing
+    if s_dc and s_inf:
+        raise RuntimeError('Does not support dc and inf reflection simultaneously!')
+    elif s_dc:
+        fz0 = np.flip(fz, 0).conj()
+        s0 = (1 / np.flip(s, 0)).conj()
+        if s_dc == -1:  # fit z(1/s)
+            fz_model = vector_fitting_rescale(fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fs = (fz_model.model(s0) - 1) / (fz_model.model(s0) + 1)
+            fs = np.flip(fs, 0).conj()
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=-1)
+        elif s_dc == 1:  # fit 1/z(1/s)
+            fy_model = vector_fitting_rescale(1/fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fs = (1 - fy_model.model(s0)) / (1 + fy_model.model(s0))
+            fs = np.flip(fs, 0).conj()
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=1)
+        else:  # not supported
+            raise RuntimeError('Does not support z_dc not 0 or infinity!')
+        # f_model = f_model.inverse_freq()
+    elif s_inf:
+        if s_inf == -1:  # fit z(s)
+            fz_model = vector_fitting_rescale(fz, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fs = (fz_model.model(s) - 1) / (fz_model.model(s) + 1)
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=-1)
+        elif s_inf == 1:  # fit 1/z(s)
+            fy_model = vector_fitting_rescale(1/fz, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fs = (1 - fy_model.model(s)) / (1 + fy_model.model(s))
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=1)
+        else:  # not supported
+            raise RuntimeError('Does not support z_inf not 0 or infinity!')
+    else:  # no specific reflection point
+        f_model = vector_fitting_rescale(f, s, n_pole, n_iter, has_const=True, has_linear=False)
+
+    return f_model
+
+
 def fit_s(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
     # Call vector_fitting function and do some post processing
     if s_dc and s_inf:
@@ -131,6 +170,7 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
 
     s_all = np.logspace(np.log10(np.min(np.abs(s))) - 3, np.log10(np.max(np.abs(s))) + 3, int(1e5)) * 1j
     f_out = None
+    param = []
 
     reflect_list = [(-1, None), (1, None), (None, -1), (None, 1)]
     if s0 == 0:
@@ -175,7 +215,7 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
                 passive = np.all(np.abs(f_model.model(s_all)) <= 1)
                 valid = passive
                 if valid:
-                    f_out = copy.copy(f_model)
+                    # f_out = copy.copy(f_model)
                     # calculate the B + delta B to be used as the stopping condition
                     bound, bw = f_model.bound(reflect)
                     bound_error = f_model.bound_error(f, s, reflect=reflect)
@@ -214,25 +254,63 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
                 wt_inf.append(wtl)
                 pole_num_inf.append(n_pole)
         # check the exit condition here for pole loop
-        # if the B + dB is larger than the previous n loops, then break
-        n = 5
+        # exit condition: if the B + dB for the current loop of n_pole is at most n-th smallest
+        n = 3
+        exit_cond_zero = False
+        exit_cond_inf = False
         if len(f_zero) > n:
             b_min = []
-            for i in range(n+1):
-                b_min.append(np.min(np.array(b_zero[-(n+1-i)]) + np.array(db_zero[-(n+1-i)])))
-            if np.argmin(np.array(b_min)) == 0:  # stop
-                f_out = f_zero[-(n+1)][np.argmin(np.array(b_zero[-(n+1)]) + np.array(db_zero[-(n+1)]))]
-                # return f_out
-                return f_out, [b_zero, db_zero, wt_zero, pole_num_zero]
+            for i in range(len(f_zero)):
+                b_min.append(np.min(np.array(b_zero[i]) + np.array(db_zero[i])))
+            b_min = np.array(b_min)
+            idx = [i for i, p in enumerate(pole_num_zero) if p == n_pole]
+            exit_cond_zero = True
+            for i in idx:
+                if np.sum(b_min < b_min[i]) < n:
+                    exit_cond_zero = False
         elif len(f_inf) > n:
             b_min = []
-            for i in range(n+1):
-                b_min.append(np.min(np.array(b_inf[-(n+1-i)]) + np.array(db_inf[-(n+1-i)])))
-            if np.argmin(np.array(b_min)) == 0:  # stop
-                f_out = f_inf[-(n+1)][np.argmin(np.array(b_inf[-(n+1)]) + np.array(db_inf[-(n+1)]))]
-                # return f_out
-                return f_out, [b_inf, db_inf, wt_inf, pole_num_inf]
-    return f_out, []
+            for i in range(len(f_inf)):
+                b_min.append(np.min(np.array(b_inf[i]) + np.array(db_inf[i])))
+            b_min = np.array(b_min)
+            idx = [i for i, p in enumerate(pole_num_inf) if p == n_pole]
+            exit_cond_inf = True
+            for i in idx:
+                if np.sum(b_min < b_min[i]) < n:  # FIXME: something wrong with the exit condition
+                    exit_cond_inf = False
+        if exit_cond_zero or exit_cond_inf:
+            break
+
+    # return the result here
+    # get the function index with minimum B + dB for both zero and inf
+    f_out_zero = None
+    f_out_inf = None
+    idx_zero = []
+    idx_inf = []
+    b_min_zero = np.inf
+    b_min_inf = np.inf
+    for i, fl in enumerate(f_zero):
+        for j, f in enumerate(fl):
+            if b_zero[i][j] + db_zero[i][j] < b_min_zero:
+                b_min_zero = b_zero[i][j] + db_zero[i][j]
+                idx_zero = [i, j]
+                f_out_zero = copy.copy(f)
+    for i, fl in enumerate(f_inf):
+        for j, f in enumerate(fl):
+            if b_inf[i][j] + db_inf[i][j] < b_min_inf:
+                b_min_inf = b_inf[i][j] + db_inf[i][j]
+                idx_inf = [i, j]
+                f_out_inf = copy.copy(f)
+
+    # pick f_out_zero or f_out_inf?
+    # choose the one with smaller number of poles
+    if not pole_num_inf or (pole_num_zero and pole_num_inf and pole_num_zero[idx_zero[0]] < pole_num_inf[idx_inf[0]]):
+        f_out = f_out_zero
+        param = [b_zero, db_zero, wt_zero, pole_num_zero, idx_zero]
+    elif not pole_num_zero or (pole_num_inf and pole_num_zero and pole_num_zero[idx_zero[0]] >= pole_num_inf[idx_inf[0]]):
+        f_out = f_out_inf
+        param = [b_inf, db_inf, wt_inf, pole_num_inf, idx_inf]
+    return f_out, param
 
 
 def mode_fitting(f, s, bound_output=False):

@@ -117,7 +117,7 @@ def calculate_zero(pole, residue, const):
 
 
 def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None, reflect_z=None,
-                   bound_wt=None):
+                   bound_wt=None, bound_wt_z=None):
     if reflect_z is not None and not has_const:
         # has_const = True
         raise RuntimeError('reflect_z is set but has_const is False.  Setting it has_const = True!')
@@ -134,7 +134,7 @@ def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, 
 
     for k in range(n_iter):
         fk = iteration_step(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole,
-                            reflect_z=reflect_z, bound_wt=bound_wt)
+                            reflect_z=reflect_z, bound_wt=bound_wt, bound_wt_z=bound_wt_z)
     f_model = final_step(f, s, fk, has_const=has_const, has_linear=has_linear, reflect_z=reflect_z, bound_wt=bound_wt)
 
     return f_model
@@ -161,7 +161,7 @@ def vector_fitting_rescale(f, s, *args, **kwargs):
     return f_model
 
 
-def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound_wt):
+def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound_wt, bound_wt_z):
     n_pole = len(fk.pole)
     n_freq = len(s)
     n_fixed = 0
@@ -219,6 +219,17 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
                 a[0, -n_pole + i] = -2 * a[0, i]
         a *= bound_wt
         A = np.vstack([A, a])
+    elif bound_wt_z and bound_wt_z > 0:  # Require fitting Z with short at infinity, equations same for z_inf = 0
+        a = np.zeros((1, A.shape[1]), dtype=A.dtype)
+        for i, p in enumerate(fk.pole):
+            if i >= n_fixed:
+                if pole_pair[i] == 0:
+                    a[0, -n_pole + i] = np.pi
+                elif pole_pair[i] == 1:
+                    a[0, -n_pole + i] = 2 * np.pi
+                    a[0, -n_pole + i + 1] = 0
+        a *= bound_wt_z
+        A = np.vstack([A, a])
 
     cA = np.linalg.cond(A)
     if cA > 1e13:
@@ -229,6 +240,8 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
     b = np.concatenate([np.real(b), np.imag(b)])
     if bound_wt and bound_wt > 0:
         b = np.concatenate([b, [np.real(np.sum(fk.pole))*np.pi*bound_wt]])
+    elif bound_wt_z and bound_wt_z > 0:
+        b = np.concatenate([b, [np.real(np.sum(fk.pole))*np.pi*bound_wt_z]])
 
     # Solve for x
     x, residuals, rank, singular = np.linalg.lstsq(A, b, rcond=-1)

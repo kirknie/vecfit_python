@@ -164,10 +164,14 @@ class RationalFct:
         """
         return bound_integral(self.model(s), s, reflect)
 
-    def plot_improved_bound(self, real_limit, imag_limit, ax=None):
+    def plot_improved_bound(self, real_limit=None, imag_limit=None, ax=None):
         if ax is None:
             fig = plt.figure(figsize=default_figure_size)
             ax = fig.add_subplot(111)
+        if real_limit is None:
+            real_limit = 1.1 * np.max([np.max(np.abs(self.pole.real)), np.max(np.abs(self.zero().real))])
+        if imag_limit is None:
+            imag_limit = 1.1 * np.max([np.max(np.abs(self.pole.imag)), np.max(np.abs(self.zero().imag))])
 
         sample = 2000
         x = np.linspace(-real_limit, 0, sample)
