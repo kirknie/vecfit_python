@@ -313,14 +313,15 @@ def transmission_line_model():
 
     # Try to fit S
     # f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
-    f_out = vecfit.bound_tightening(s_data, cs)
+    # f_out = vecfit.bound_tightening(s_data, cs)
+    f_out, log = vecfit.bound_tightening_sweep(s_data, cs, np.inf)
 
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
     # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
     ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
     print('Model has {} poles'.format(f_out.pole.shape[0]))
-    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
+    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, sum is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, bound + bound_error, ant_integral))
 
     ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
     f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
@@ -340,9 +341,9 @@ def transmission_line_model_vs_freq_range():
     l0 = 2.5e-9
     n = 9  # number of stages
 
-    # start freq 0.1 GHz, end freq 2/3/4/5 GHz
+    # start freq 0.1 GHz, end freq 3/4/5 GHz
     f1 = 1e8
-    f2_list = [2e9, 3e9, 4e9, 5e9]
+    f2_list = [3e9, 4e9, 5e9, 6e9]
     bound_list = []
     bound_error_list = []
     f_out_list = []
@@ -359,7 +360,8 @@ def transmission_line_model_vs_freq_range():
 
         # Try to fit S
         # f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
-        f_out = vecfit.bound_tightening(s_data, cs)
+        # f_out = vecfit.bound_tightening(s_data, cs)
+        f_out, log = vecfit.bound_tightening_sweep(s_data, cs, np.inf, -1)
 
         bound, bw = f_out.bound(np.inf, f0=2.4e9)
         bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
@@ -368,6 +370,13 @@ def transmission_line_model_vs_freq_range():
         bound_list.append(bound)
         bound_error_list.append(bound_error)
         pole_num_list.append(f_out.pole.shape[0])
+        print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(f_out.pole), bound, bound_error, bound + bound_error))
+
+    f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
+    bound, bw = f_out.bound(np.inf, f0=2.4e9)
+    bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(f_out.pole), bound, bound_error,
+                                                                    bound + bound_error))
 
     fig = plt.figure(figsize=(8, 5.5))
     ax1 = fig.add_subplot(111)
@@ -384,7 +393,6 @@ def transmission_line_model_vs_freq_range():
     for i, pole_num in enumerate(pole_num_list):
         legend_text += ['Model {} ({} poles)'.format(i+1, pole_num), 'Model {} error'.format(i+1)]
     ax1.legend(legend_text)
-    fig.savefig('/Users/dingnie/Desktop/model_vs_freq_range.pdf', dpi=360, format='pdf')
 
     # pole vs bound
     fig = plt.figure(figsize=(8, 5.5))
@@ -393,7 +401,6 @@ def transmission_line_model_vs_freq_range():
     ax2.plot(pole_num_list, bound_list, '--')
     ax2.plot(pole_num_list, bound_error_list, '--')
     ax2.legend([r'$B+\delta B$', r'$B$', r'$\delta B$'])
-    fig.savefig('/Users/dingnie/Desktop/circuit_bound_vs_poles.pdf', dpi=360, format='pdf')
 
 
 def dipole():
@@ -1042,12 +1049,12 @@ if __name__ == '__main__':
     # coupled_siw()
     # transmission_line_model()
     transmission_line_model_vs_freq_range()
-    # short_dipole_0()
     # dipole()
     # dipole_bound_vs_pole()
     # long_dipole_paper()
     # long_dipole_bound_vs_pole()
     # short_dipole()
+    # short_dipole_0()
     # coupled_dipole()
     # skycross_antennas()
     # two_ifa()

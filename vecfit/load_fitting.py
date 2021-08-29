@@ -267,7 +267,7 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
                 pole_num_inf.append(n_pole)
         # check the exit condition here for pole loop
         # exit condition: if the B + dB for the current loop of n_pole is at most n-th smallest
-        n = 3
+        n = 5
         exit_cond_zero = False
         exit_cond_inf = False
         if len(f_zero) > n:

@@ -205,8 +205,9 @@ def iteration_step(f, s, fk, has_const, has_linear, fit_wt, fixed_pole, reflect_
                             1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
 
     # Apply weight to A
-    W = np.sqrt(np.diag(fit_wt))
-    A = np.dot(W, A)
+    if fit_wt is not None:
+        W = np.sqrt(np.diag(fit_wt))
+        A = np.dot(W, A)
     # Form real equations from complex equations
     A = np.vstack([np.real(A), np.imag(A)])
 
@@ -240,7 +241,8 @@ def iteration_step(f, s, fk, has_const, has_linear, fit_wt, fixed_pole, reflect_
 
     # Construct b
     b = f
-    b = np.dot(b, W)
+    if fit_wt is not None:
+        b = np.dot(b, W)
     b = np.concatenate([np.real(b), np.imag(b)])
     if bound_wt and bound_wt > 0:
         b = np.concatenate([b, [np.real(np.sum(fk.pole))*np.pi*bound_wt]])
@@ -317,8 +319,9 @@ def final_step(f, s, fk, has_const, has_linear, fit_wt, reflect_z, bound_wt):
                             1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
 
     # Apply weight to A
-    W = np.sqrt(np.diag(fit_wt))
-    A = np.dot(W, A)
+    if fit_wt is not None:
+        W = np.sqrt(np.diag(fit_wt))
+        A = np.dot(W, A)
     # Form real equations from complex equations
     A = np.vstack([np.real(A), np.imag(A)])
 
@@ -339,7 +342,8 @@ def final_step(f, s, fk, has_const, has_linear, fit_wt, reflect_z, bound_wt):
 
     # Construct b
     b = f
-    b = np.dot(b, W)
+    if fit_wt is not None:
+        b = np.dot(b, W)
     b = np.concatenate([np.real(b), np.imag(b)])
     if bound_wt and bound_wt > 0:
         b = np.concatenate([b, [np.real(np.sum(fk.pole))*np.pi*bound_wt]])
