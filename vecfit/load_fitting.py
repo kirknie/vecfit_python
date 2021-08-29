@@ -17,37 +17,43 @@ def fit_z(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pol
     return f_model
 
 
-# def fit_z_tight(f, s, n_pole=10, n_iter=10, z_dc=None, z_inf=None, bound_wt_z=None):
-def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
+def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, fit_wt=None, bound_wt=None):
     fz = (1 + f) / (1 - f)
+    if fit_wt is None:
+        wt = 1 / (1 - np.abs(np.power(f, 2)))
+        # wt = np.power(1 / (1 - np.abs(np.power(f, 2))), 1)
+        # wt = np.ones(len(s))
+    else:
+        wt = fit_wt
     # Call vector_fitting function and do some post processing
     if s_dc and s_inf:
         raise RuntimeError('Does not support dc and inf reflection simultaneously!')
     elif s_dc:
         fz0 = np.flip(fz, 0).conj()
         s0 = (1 / np.flip(s, 0)).conj()
+        wt = np.flip(wt, 0)
         if s_dc == -1:  # fit z(1/s)
-            fz_model = vector_fitting_rescale(fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fz_model = vector_fitting_rescale(fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
             fs = (fz_model.model(s0) - 1) / (fz_model.model(s0) + 1)
             fs = np.flip(fs, 0).conj()
-            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=-1)
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=-1, fit_wt=np.ones(len(s)))
         elif s_dc == 1:  # fit 1/z(1/s)
-            fy_model = vector_fitting_rescale(1/fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fy_model = vector_fitting_rescale(1/fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
             fs = (1 - fy_model.model(s0)) / (1 + fy_model.model(s0))
             fs = np.flip(fs, 0).conj()
-            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=1)
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=1, fit_wt=np.ones(len(s)))
         else:  # not supported
             raise RuntimeError('Does not support z_dc not 0 or infinity!')
         # f_model = f_model.inverse_freq()
     elif s_inf:
         if s_inf == -1:  # fit z(s)
-            fz_model = vector_fitting_rescale(fz, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fz_model = vector_fitting_rescale(fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
             fs = (fz_model.model(s) - 1) / (fz_model.model(s) + 1)
-            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=-1)
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=-1, fit_wt=np.ones(len(s)))
         elif s_inf == 1:  # fit 1/z(s)
-            fy_model = vector_fitting_rescale(1/fz, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt_z=bound_wt)
+            fy_model = vector_fitting_rescale(1/fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
             fs = (1 - fy_model.model(s)) / (1 + fy_model.model(s))
-            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=1)
+            f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=1, fit_wt=np.ones(len(s)))
         else:  # not supported
             raise RuntimeError('Does not support z_inf not 0 or infinity!')
     else:  # no specific reflection point
@@ -56,7 +62,12 @@ def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
     return f_model
 
 
-def fit_s(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
+def fit_s(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, fit_wt=None, bound_wt=None):
+    if fit_wt is None:
+        wt = np.power(1 / (1 - np.abs(np.power(f, 2))), 1)
+        # wt = np.ones(len(s))
+    else:
+        wt = fit_wt
     # Call vector_fitting function and do some post processing
     if s_dc and s_inf:
         raise RuntimeError('Does not support dc and inf reflection simultaneously!')
@@ -74,23 +85,24 @@ def fit_s(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, bound_wt=None):
         # New method for fitting s_dc: inverse frequency
         f0 = np.flip(f, 0).conj()
         s0 = (1 / np.flip(s, 0)).conj()
+        wt = np.flip(wt, 0)
         if s_dc == 1:  # 1-s is bounded
-            f_model = vector_fitting_rescale(1-f0, s0, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=bound_wt)
+            f_model = vector_fitting_rescale(1-f0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt=bound_wt)
             f_model.const = 1
             f_model.residue = -f_model.residue
         elif s_dc == -1:  # 1+s is bounded
-            f_model = vector_fitting_rescale(1+f0, s0, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=bound_wt)
+            f_model = vector_fitting_rescale(1+f0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt=bound_wt)
             f_model.const = -1
         else:  # not supported
             raise RuntimeError('Does not support s_dc not +/-1!')
         f_model = f_model.inverse_freq()
     elif s_inf:
         if s_inf == 1:  # 1-s is bounded
-            f_model = vector_fitting_rescale(1-f, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=bound_wt)
+            f_model = vector_fitting_rescale(1-f, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt=bound_wt)
             f_model.const = 1
             f_model.residue = -f_model.residue
         elif s_inf == -1:  # 1+s is bounded
-            f_model = vector_fitting_rescale(1+f, s, n_pole, n_iter, has_const=False, has_linear=False, bound_wt=bound_wt)
+            f_model = vector_fitting_rescale(1+f, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt=bound_wt)
             f_model.const = -1
         else:  # not supported
             raise RuntimeError('Does not support s_inf not +/-1!')
@@ -132,7 +144,7 @@ def bound_tightening(f, s, s0=None, fs0=None, err=-20):
             start_tighten = False
             backtrace = False
             for i in range(wt_iter):
-                f_model = fit_s(f, s, n_pole, n_iter, s_dc, s_inf, wt)
+                f_model = fit_s(f, s, n_pole, n_iter, s_dc, s_inf, bound_wt=wt)
 
                 # check if the result is passive
                 small_error = np.linalg.norm(f_model.model(s) - f, norm_order) < error_limit
@@ -209,7 +221,7 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
             dbl = []
             wtl = []
             for i in range(wt_iter):
-                f_model = fit_s(f, s, n_pole, n_iter, s_dc, s_inf, wt)
+                f_model = fit_s_v2(f, s, n_pole, n_iter, s_dc, s_inf, bound_wt=wt)
 
                 # check if the result is passive
                 passive = np.all(np.abs(f_model.model(s_all)) <= 1)

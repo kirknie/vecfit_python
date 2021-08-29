@@ -506,54 +506,48 @@ def long_dipole_paper():
     pole_model = [0, p1, p2, p3, p4]
     zero_model = [1 / C0, r1, r2, r3, r4]
     z_model = vecfit.RationalFct(pole_model, zero_model, 0, L0)
-    s_model = (z_model.model(cs) - z0) / (z_model.model(cs) + z0)
+    s_tmp = (z_model.model(cs) - z0) / (z_model.model(cs) + z0)
+    s_model = vecfit.fit_s(s_tmp, cs, n_pole=6, n_iter=20, s_inf=1)
+    paper_bound, paper_bw = s_model.bound(np.inf, f0=2.4e9)
+    paper_bound_error = s_model.bound_error(s_data, cs, reflect=np.inf)
 
-    # zl = z_model.model(cs)
-    # rl = zl.real
-    # xl = zl.imag
-    # ax1 = vecfit.plot_freq_resp(cs, rl)
-    # vecfit.plot_freq_resp(cs, xl, ax=ax1)
-
+    zl = z_model.model(cs)
     zl2 = 1/(cs*C0) + cs*L0 + 1/(1/R1 + 1/(cs*L1) + cs*C1) + 1/(1/R2 + 1/(cs*L2) + cs*C2)
     # zl2 = 1/(cs*C0) + cs*L0 + 1/(1/R1 + 1/(cs*L1) + cs*C1)
     # zl2 = 1/(cs*C0) + cs*L0
     # zl2 = 1/(1/R1 + 1/(cs*L1) + cs*C1)
-    rl2 = zl2.real
-    xl2 = zl2.imag
-    ax2 = vecfit.plot_freq_resp(cs, rl2)
-    vecfit.plot_freq_resp(cs, xl2, ax=ax2)
-
-    rl3 = z_data.real
-    xl3 = z_data.imag
-    ax3 = vecfit.plot_freq_resp(cs, rl3)
-    vecfit.plot_freq_resp(cs, rl2, ax=ax3, linestyle='--')
-    vecfit.plot_freq_resp(cs, xl3, ax=ax3)
-    vecfit.plot_freq_resp(cs, xl2, ax=ax3, linestyle='--')
 
     # Use algorithm to fit S
-    f_out = vecfit.bound_tightening(s_data, cs)
+    # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=1)
+    # f_out = vecfit.bound_tightening(s_data, cs)
+    f_out, log = vecfit.bound_tightening_sweep(s_data, cs, np.inf)
     z_fit = (1 + f_out.model(cs)) / (1 - f_out.model(cs)) * z0
-
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
-    # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
-    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
-    print('Bound is {:.5e}, BW is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bw, bound_error, ant_integral))
 
-    fit_ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db', color=colors(0))
-    f_out.plot(cs, ax=fit_ax1, y_scale='db', linestyle='--', color=colors(1))
-    vecfit.plot_freq_resp(cs, s_model, ax=fit_ax1, y_scale='db', linestyle='--', color=colors(2))
-    vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=fit_ax1, y_scale='db', linestyle='-.', color=colors(1))
-    vecfit.plot_freq_resp(cs, s_data-s_model, ax=fit_ax1, y_scale='db', linestyle='-.', color=colors(2))
+    # Use manual algorithm to fit S
+    # f_out2 = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=1)
+    f_out2 = vecfit.fit_s_v2(s_data, cs, n_pole=6, n_iter=20, s_inf=1)
+    z_fit2 = (1 + f_out2.model(cs)) / (1 - f_out2.model(cs)) * z0
+    bound2, bw2 = f_out2.bound(np.inf, f0=2.4e9)
+    bound_error2 = f_out2.bound_error(s_data, cs, reflect=np.inf)
 
-    f_out.plot_improved_bound(3e11, 1e11)
+    # plots
+    ax = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    vecfit.plot_freq_resp(cs, s_tmp, ax=ax, y_scale='db', linestyle='--')
+    f_out.plot(cs, ax=ax, y_scale='db', linestyle='--')
+    f_out2.plot(cs, ax=ax, y_scale='db', linestyle='--')
+    ax.set_ylabel(r'Reflection coefficient $\Gamma$ (dB)')
+    ax.legend(['Simulation', 'Paper [16?]', 'Algorithm 2', 'Impedance Method'])
+    ax.grid(True, which='both', linestyle='--')
 
-    rl4 = z_fit.real
-    xl4 = z_fit.imag
-    ax4 = vecfit.plot_freq_resp(cs, rl3)
-    vecfit.plot_freq_resp(cs, rl4, ax=ax4, linestyle='--')
-    vecfit.plot_freq_resp(cs, xl3, ax=ax4)
-    vecfit.plot_freq_resp(cs, xl4, ax=ax4, linestyle='--')
+    # bound values
+    print('Paper:')
+    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(s_model.pole), paper_bound, paper_bound_error, paper_bound + paper_bound_error))
+    print('Algorithm:')
+    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(f_out.pole), bound, bound_error, bound + bound_error))
+    print('Manual comparison:')
+    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(f_out2.pole), bound2, bound_error2, bound2 + bound_error2))
 
 
 def dipole_bound_vs_pole():

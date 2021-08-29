@@ -116,7 +116,7 @@ def calculate_zero(pole, residue, const):
     return z
 
 
-def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None, reflect_z=None,
+def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fit_wt=None, fixed_pole=None, reflect_z=None,
                    bound_wt=None, bound_wt_z=None):
     if reflect_z is not None and not has_const:
         # has_const = True
@@ -133,9 +133,9 @@ def vector_fitting(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, 
     fk = RationalFct(p, residue=None)  # need to be updated before use
 
     for k in range(n_iter):
-        fk = iteration_step(f, s, fk, has_const=has_const, has_linear=has_linear, fixed_pole=fixed_pole,
+        fk = iteration_step(f, s, fk, has_const=has_const, has_linear=has_linear, fit_wt=fit_wt, fixed_pole=fixed_pole,
                             reflect_z=reflect_z, bound_wt=bound_wt, bound_wt_z=bound_wt_z)
-    f_model = final_step(f, s, fk, has_const=has_const, has_linear=has_linear, reflect_z=reflect_z, bound_wt=bound_wt)
+    f_model = final_step(f, s, fk, has_const=has_const, has_linear=has_linear, fit_wt=fit_wt, reflect_z=reflect_z, bound_wt=bound_wt)
 
     return f_model
 
@@ -161,7 +161,7 @@ def vector_fitting_rescale(f, s, *args, **kwargs):
     return f_model
 
 
-def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound_wt, bound_wt_z):
+def iteration_step(f, s, fk, has_const, has_linear, fit_wt, fixed_pole, reflect_z, bound_wt, bound_wt_z):
     n_pole = len(fk.pole)
     n_freq = len(s)
     n_fixed = 0
@@ -204,6 +204,9 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
                 A[:, i+1] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
                             1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
 
+    # Apply weight to A
+    W = np.sqrt(np.diag(fit_wt))
+    A = np.dot(W, A)
     # Form real equations from complex equations
     A = np.vstack([np.real(A), np.imag(A)])
 
@@ -237,6 +240,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
 
     # Construct b
     b = f
+    b = np.dot(b, W)
     b = np.concatenate([np.real(b), np.imag(b)])
     if bound_wt and bound_wt > 0:
         b = np.concatenate([b, [np.real(np.sum(fk.pole))*np.pi*bound_wt]])
@@ -275,7 +279,7 @@ def iteration_step(f, s, fk, has_const, has_linear, fixed_pole, reflect_z, bound
     return RationalFct(pk, rk, dk, hk, ~np.any(unstable))
 
 
-def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
+def final_step(f, s, fk, has_const, has_linear, fit_wt, reflect_z, bound_wt):
     n_pole = len(fk.pole)
     n_freq = len(s)
     pole_pair = pair_pole(fk.pole)
@@ -312,6 +316,9 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
                 A[:, i+1] += -1j * (1 / (s0 - p) + 1 / (-s0 - p)) / 2 + 1j * (
                             1 / (s0 - p.conj()) + 1 / (-s0 - p.conj())) / 2
 
+    # Apply weight to A
+    W = np.sqrt(np.diag(fit_wt))
+    A = np.dot(W, A)
     # Form real equations from complex equations
     A = np.vstack([np.real(A), np.imag(A)])
 
@@ -332,6 +339,7 @@ def final_step(f, s, fk, has_const, has_linear, reflect_z, bound_wt):
 
     # Construct b
     b = f
+    b = np.dot(b, W)
     b = np.concatenate([np.real(b), np.imag(b)])
     if bound_wt and bound_wt > 0:
         b = np.concatenate([b, [np.real(np.sum(fk.pole))*np.pi*bound_wt]])
