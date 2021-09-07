@@ -411,7 +411,8 @@ def dipole():
     # Try to fit S
     # f_out = vecfit.fit_s(s_data, cs, n_pole=3, n_iter=20, s_inf=-1)
     # f_out = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=-1, bound_wt=0.3)
-    f_out = vecfit.bound_tightening(s_data, cs)
+    # f_out = vecfit.bound_tightening(s_data, cs)  # np.inf, -1
+    f_out, log = vecfit.bound_tightening_sweep(s_data, cs)
 
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
@@ -460,7 +461,8 @@ def dipole_paper():
     s_model = (z_model.model(cs) - 1) / (z_model.model(cs) + 1)
 
     # Try to fit S
-    f_out = vecfit.bound_tightening(s_data, cs)
+    # f_out = vecfit.bound_tightening(s_data, cs)
+    f_out, log = vecfit.bound_tightening_sweep(s_data, cs)
 
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
@@ -561,84 +563,121 @@ def dipole_bound_vs_pole():
     s1p_file = './resource/single_dipole.s1p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
     cs = freq*2j*np.pi
+    s_all = np.logspace(np.log10(np.min(np.abs(cs))) - 3, np.log10(np.max(np.abs(cs))) + 3, int(1e5)) * 1j
 
-    # Try to fit S
-    # f_out = vecfit.bound_tightening(s_data, cs)
-    ant_integral = vecfit.bound_integral(s_data, cs, np.inf)
-    ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    # plot 1: bound vs pole with reflection inf
+    # ax1 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
     pole_list = []
     bound_list = []
     bound_error_list = []
-    for i in range(1, 20):
-        f_out = vecfit.fit_s(s_data, cs, n_pole=i, n_iter=20, s_inf=-1)
+    for i in range(1, 11):
+        f_out = vecfit.fit_s_v2(s_data, cs, n_pole=i, n_iter=20, s_inf=-1)
+        passive = np.all(np.abs(f_out.model(s_all)) <= 1)
+        print('Pole {}, passive {}, stable {}'.format(i, passive, f_out.stable))
         bound, bw = f_out.bound(np.inf, f0=2.4e9)
         bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
         pole_list.append(i)
         bound_list.append(bound)
         bound_error_list.append(bound_error)
-        f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
-        vecfit.plot_freq_resp(cs, s_data - f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
+        # f_out.plot(cs, ax=ax1, y_scale='db', linestyle='--')
+        # vecfit.plot_freq_resp(cs, s_data - f_out.model(cs), ax=ax1, y_scale='db', linestyle='--')
 
-    # ax2 = f_out.plot_improved_bound(1e11, 4e10)
     fig = plt.figure(figsize=(8, 5.5))
     ax = fig.add_subplot(111)
-    ax.plot(pole_list, np.array(bound_list) + np.array(bound_error_list))
     ax.plot(pole_list, bound_list, '--')
     ax.plot(pole_list, bound_error_list, '--')
-    ax.set_xlabel(r'$N_p$')
-    ax.legend([r'$B+\delta B$', r'$B$', r'$\delta B$'])
+    ax.plot(pole_list, np.array(bound_list) + np.array(bound_error_list))
+    ax.set_xlabel(r'Number of poles $N_p$')
+    ax.set_ylabel(r'Bound ($s_0=\infty$)')
+    ax.legend([r'$B$', r'$\delta B$', r'$B+\delta B$'])
     ax.grid(True, which='both', linestyle='--')
-    # fig.savefig('/Users/dingnie/Desktop/dipole_bound_vs_poles.pdf', dpi=360, format='pdf')
-    # plt.show()
 
-    ax2 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
+    # plot 2: bound vs pole with reflection 0
+    # ax2 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
     pole_list = []
     bound_list = []
     bound_error_list = []
-    for i in range(1, 20):
-        f_out = vecfit.fit_s(s_data, cs, n_pole=i, n_iter=20, s_dc=1)
+    for i in range(1, 13):
+        f_out = vecfit.fit_s_v2(s_data, cs, n_pole=i, n_iter=20, s_dc=1)
+        passive = np.all(np.abs(f_out.model(s_all)) <= 1)
+        print('Pole {}, passive {}, stable {}'.format(i, passive, f_out.stable))
         bound, bw = f_out.bound(0, f0=2.4e9)
         bound_error = f_out.bound_error(s_data, cs, reflect=0)
         pole_list.append(i)
         bound_list.append(bound)
         bound_error_list.append(bound_error)
-        f_out.plot(cs, ax=ax2, y_scale='db', linestyle='--')
-        vecfit.plot_freq_resp(cs, s_data - f_out.model(cs), ax=ax2, y_scale='db', linestyle='--')
+        # f_out.plot(cs, ax=ax2, y_scale='db', linestyle='--')
+        # vecfit.plot_freq_resp(cs, s_data - f_out.model(cs), ax=ax2, y_scale='db', linestyle='--')
 
-    # ax2 = f_out.plot_improved_bound(1e11, 4e10)
     fig = plt.figure(figsize=(8, 5.5))
     ax = fig.add_subplot(111)
-    ax.plot(pole_list, np.array(bound_list) + np.array(bound_error_list))
     ax.plot(pole_list, bound_list, '--')
     ax.plot(pole_list, bound_error_list, '--')
-    plt.show()
+    ax.plot(pole_list, np.array(bound_list) + np.array(bound_error_list))
+    ax.set_xlabel(r'Number of poles $N_p$')
+    ax.set_ylabel(r'Bound ($s_0=0$)')
+    ax.legend([r'$B$', r'$\delta B$', r'$B+\delta B$'])
+    ax.grid(True, which='both', linestyle='--')
 
-    # # plot bound vs pole when th tightening method is used
-    # ax3 = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
-    # pole_list = []
-    # bound_list = []
-    # bound_error_list = []
-    # for i in range(1, 20):
-    #     f_out = vecfit.bound_tightening(s_data, cs, i)
-    #     if f_out is None:
-    #         bound = np.nan
-    #         bound_error = np.nan
-    #     else:
-    #         bound, bw = f_out.bound(0, f0=2.4e9)
-    #         bound_error = f_out.bound_error(s_data, cs, reflect=0)
-    #     pole_list.append(i)
-    #     bound_list.append(bound)
-    #     bound_error_list.append(bound_error)
-    #     # f_out.plot(cs, ax=ax3, y_scale='db', linestyle='--')
-    #     # vecfit.plot_freq_resp(cs, s_data - f_out.model(cs), ax=ax3, y_scale='db', linestyle='--')
-    #
-    # # ax2 = f_out.plot_improved_bound(1e11, 4e10)
-    # fig = plt.figure(figsize=(8, 5.5))
-    # ax = fig.add_subplot(111)
-    # ax.plot(pole_list, np.array(bound_list) + np.array(bound_error_list))
-    # ax.plot(pole_list, bound_list, '--')
-    # ax.plot(pole_list, bound_error_list, '--')
-    # plt.show()
+    # plot 3: bound vs weight with reflection inf
+    wt_list = []
+    bound_list = []
+    bound_error_list = []
+    wt = 0
+    wt_step = 0.1
+    while True:
+        f_out = vecfit.fit_s_v2(s_data, cs, n_pole=3, n_iter=20, s_inf=-1, bound_wt=wt)
+        passive = np.all(np.abs(f_out.model(s_all)) <= 1)
+        if passive and f_out.stable:
+            bound, bw = f_out.bound(np.inf, f0=2.4e9)
+            bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
+            wt_list.append(wt)
+            bound_list.append(bound)
+            bound_error_list.append(bound_error)
+            wt += wt_step
+        else:
+            print('Stop at weight {:g}, passive {}, stable {}'.format(wt, passive, f_out.stable))
+            break
+
+    fig = plt.figure(figsize=(8, 5.5))
+    ax = fig.add_subplot(111)
+    ax.plot(wt_list, bound_list, '--')
+    ax.plot(wt_list, bound_error_list, '--')
+    ax.plot(wt_list, np.array(bound_list) + np.array(bound_error_list))
+    ax.set_xlabel(r'Weight $\alpha$')
+    ax.set_ylabel(r'Bound ($s_0=\infty$)')
+    ax.legend([r'$B$', r'$\delta B$', r'$B+\delta B$'])
+    ax.grid(True, which='both', linestyle='--')
+
+    # plot 4: bound vs weight with reflection 0
+    wt_list = []
+    bound_list = []
+    bound_error_list = []
+    wt = 0
+    wt_step = 0.001
+    while True:
+        f_out = vecfit.fit_s_v2(s_data, cs, n_pole=5, n_iter=20, s_dc=1, bound_wt=wt)
+        passive = np.all(np.abs(f_out.model(s_all)) <= 1)
+        if passive and f_out.stable:
+            bound, bw = f_out.bound(0, f0=2.4e9)
+            bound_error = f_out.bound_error(s_data, cs, reflect=0)
+            wt_list.append(wt)
+            bound_list.append(bound)
+            bound_error_list.append(bound_error)
+            wt += wt_step
+        else:
+            print('Stop at weight {:g}, passive {}, stable {}'.format(wt, passive, f_out.stable))
+            break
+
+    fig = plt.figure(figsize=(8, 5.5))
+    ax = fig.add_subplot(111)
+    ax.plot(wt_list, bound_list, '--')
+    ax.plot(wt_list, bound_error_list, '--')
+    ax.plot(wt_list, np.array(bound_list) + np.array(bound_error_list))
+    ax.set_xlabel(r'Weight $\alpha$')
+    ax.set_ylabel(r'Bound ($s_0=0$)')
+    ax.legend([r'$B$', r'$\delta B$', r'$B+\delta B$'])
+    ax.grid(True, which='both', linestyle='--')
 
 
 def long_dipole_bound_vs_pole():
@@ -1048,9 +1087,10 @@ if __name__ == '__main__':
     # coupled_siw_even_odd()
     # coupled_siw()
     # transmission_line_model()
-    transmission_line_model_vs_freq_range()
+    # transmission_line_model_vs_freq_range()
     # dipole()
-    # dipole_bound_vs_pole()
+    # dipole_paper()
+    dipole_bound_vs_pole()
     # long_dipole_paper()
     # long_dipole_bound_vs_pole()
     # short_dipole()
