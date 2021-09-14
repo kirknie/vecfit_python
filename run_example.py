@@ -624,8 +624,8 @@ def dipole_bound_vs_pole():
     bound_list = []
     bound_error_list = []
     wt = 0
-    wt_step = 0.1
-    while True:
+    wt_step = 1
+    while wt < 100:
         f_out = vecfit.fit_s_v2(s_data, cs, n_pole=3, n_iter=20, s_inf=-1, bound_wt=wt)
         passive = np.all(np.abs(f_out.model(s_all)) <= 1)
         if passive and f_out.stable:

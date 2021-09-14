@@ -20,25 +20,28 @@ def fit_z(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pol
 def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, fit_wt=None, bound_wt=None):
     fz = (1 + f) / (1 - f)
     if fit_wt is None:
-        wt = 1 / (1 - np.abs(np.power(f, 2)))
+        wtz = np.power(np.abs(np.power(1 - f, 2)) / (1 - np.abs(np.power(f, 2))), 2)
+        wty = np.power(np.abs(np.power(1 + f, 2)) / (1 - np.abs(np.power(f, 2))), 2)
         # wt = np.power(1 / (1 - np.abs(np.power(f, 2))), 1)
         # wt = np.ones(len(s))
     else:
-        wt = fit_wt
+        wtz = fit_wt
+        wty = fit_wt
     # Call vector_fitting function and do some post processing
     if s_dc and s_inf:
         raise RuntimeError('Does not support dc and inf reflection simultaneously!')
     elif s_dc:
         fz0 = np.flip(fz, 0).conj()
         s0 = (1 / np.flip(s, 0)).conj()
-        wt = np.flip(wt, 0)
+        wtz = np.flip(wtz, 0)
+        wty = np.flip(wty, 0)
         if s_dc == -1:  # fit z(1/s)
-            fz_model = vector_fitting_rescale(fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
+            fz_model = vector_fitting_rescale(fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wtz, bound_wt_z=bound_wt)
             fs = (fz_model.model(s0) - 1) / (fz_model.model(s0) + 1)
             fs = np.flip(fs, 0).conj()
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=-1, fit_wt=np.ones(len(s)))
         elif s_dc == 1:  # fit 1/z(1/s)
-            fy_model = vector_fitting_rescale(1/fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
+            fy_model = vector_fitting_rescale(1/fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wty, bound_wt_z=bound_wt)
             fs = (1 - fy_model.model(s0)) / (1 + fy_model.model(s0))
             fs = np.flip(fs, 0).conj()
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=1, fit_wt=np.ones(len(s)))
@@ -47,11 +50,11 @@ def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, fit_wt=None, bou
         # f_model = f_model.inverse_freq()
     elif s_inf:
         if s_inf == -1:  # fit z(s)
-            fz_model = vector_fitting_rescale(fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
+            fz_model = vector_fitting_rescale(fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wtz, bound_wt_z=bound_wt)
             fs = (fz_model.model(s) - 1) / (fz_model.model(s) + 1)
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=-1, fit_wt=np.ones(len(s)))
         elif s_inf == 1:  # fit 1/z(s)
-            fy_model = vector_fitting_rescale(1/fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wt, bound_wt_z=bound_wt)
+            fy_model = vector_fitting_rescale(1/fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wty, bound_wt_z=bound_wt)
             fs = (1 - fy_model.model(s)) / (1 + fy_model.model(s))
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=1, fit_wt=np.ones(len(s)))
         else:  # not supported
