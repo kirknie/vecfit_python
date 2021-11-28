@@ -40,11 +40,13 @@ def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, fit_wt=None, bou
             fs = (fz_model.model(s0) - 1) / (fz_model.model(s0) + 1)
             fs = np.flip(fs, 0).conj()
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=-1, fit_wt=np.ones(len(s)))
+            f_model.stable = fz_model.stable
         elif s_dc == 1:  # fit 1/z(1/s)
             fy_model = vector_fitting_rescale(1/fz0, s0, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wty, bound_wt_z=bound_wt)
             fs = (1 - fy_model.model(s0)) / (1 + fy_model.model(s0))
             fs = np.flip(fs, 0).conj()
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_dc=1, fit_wt=np.ones(len(s)))
+            f_model.stable = fy_model.stable
         else:  # not supported
             raise RuntimeError('Does not support z_dc not 0 or infinity!')
         # f_model = f_model.inverse_freq()
@@ -53,10 +55,12 @@ def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, fit_wt=None, bou
             fz_model = vector_fitting_rescale(fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wtz, bound_wt_z=bound_wt)
             fs = (fz_model.model(s) - 1) / (fz_model.model(s) + 1)
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=-1, fit_wt=np.ones(len(s)))
+            f_model.stable = fz_model.stable
         elif s_inf == 1:  # fit 1/z(s)
             fy_model = vector_fitting_rescale(1/fz, s, n_pole, n_iter, has_const=False, has_linear=False, fit_wt=wty, bound_wt_z=bound_wt)
             fs = (1 - fy_model.model(s)) / (1 + fy_model.model(s))
             f_model = fit_s(fs, s, n_pole=n_pole, n_iter=n_iter, s_inf=1, fit_wt=np.ones(len(s)))
+            f_model.stable = fy_model.stable
         else:  # not supported
             raise RuntimeError('Does not support z_inf not 0 or infinity!')
     else:  # no specific reflection point
