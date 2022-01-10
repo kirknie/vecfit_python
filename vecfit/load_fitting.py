@@ -23,10 +23,11 @@ def fit_s_v2(f, s, n_pole=10, n_iter=10, s_dc=None, s_inf=None, fit_wt=None, bou
         wtz = np.power(np.abs(np.power(1 - f, 2)) / (1 - np.abs(np.power(f, 2))), 2)
         wty = np.power(np.abs(np.power(1 + f, 2)) / (1 - np.abs(np.power(f, 2))), 2)
         # wt = np.power(1 / (1 - np.abs(np.power(f, 2))), 1)
-        # wt = np.ones(len(s))
+        # wtz = np.ones(len(s))
+        # wty = np.ones(len(s))
     else:
-        wtz = fit_wt
-        wty = fit_wt
+        wtz = fit_wt * np.power(np.abs(np.power(1 - f, 2)), 2)
+        wty = fit_wt * np.power(np.abs(np.power(1 + f, 2)), 2)
     # Call vector_fitting function and do some post processing
     if s_dc and s_inf:
         raise RuntimeError('Does not support dc and inf reflection simultaneously!')
@@ -181,7 +182,7 @@ def bound_tightening(f, s, s0=None, fs0=None, err=-20):
     return f_out
 
 
-def bound_tightening_sweep(f, s, s0=None, fs0=None):
+def bound_tightening_sweep(f, s, s0=None, fs0=None, fit_wt=None):
     n_pole_max = 50
     n_iter = 20  # Number of iterations for fitting
     wt_iter = 20  # Number of iterations for weight updating
@@ -228,7 +229,7 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None):
             dbl = []
             wtl = []
             for i in range(wt_iter):
-                f_model = fit_s_v2(f, s, n_pole, n_iter, s_dc, s_inf, bound_wt=wt)
+                f_model = fit_s_v2(f, s, n_pole, n_iter, s_dc, s_inf, bound_wt=wt, fit_wt=fit_wt)
 
                 # check if the result is passive
                 passive = np.all(np.abs(f_model.model(s_all)) <= 1)
@@ -342,9 +343,17 @@ def mode_fitting(f, s, bound_output=False):
     residue = np.zeros([N, N, 0], dtype=np.complex128)
     const = np.zeros([N, N], dtype=np.complex128)
 
+    # calculate the singular values of each frequency to get the fit weight for the matrix
+    fit_wt = np.ones(len(s))
+    for i in range(len(s)):
+        # u, s, vh = np.linalg.svd(f[:, :, i])
+        sv = np.linalg.svd(f[:, :, i], compute_uv=False)
+        fit_wt[i] = np.sqrt(1 + (np.power(sv[0], 2) - np.power(sv[-1], 2)) / np.power(1 - sv[0], 2)) / (1 - np.power(sv[0], 2))
+
     for i in range(N):
         sigma_n = Sigma[i, i, :-1]
-        sigma_model = bound_tightening(sigma_n, s)
+        # sigma_model = bound_tightening(sigma_n, s, np.inf)
+        sigma_model, log = bound_tightening_sweep(sigma_n, s, np.inf, fit_wt=fit_wt)
         all_model.append(copy.copy(sigma_model))
 
         # re-build the matrix model
