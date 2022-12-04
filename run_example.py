@@ -534,6 +534,13 @@ def long_dipole_paper():
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
 
+    # # try to draw a model for the dipole model
+    # z_fit_model = vecfit.fit_z(z_fit, cs, n_pole=7, n_iter=20, has_const=False, has_linear=False)
+    # axz = vecfit.plot_freq_resp(cs, z_fit, y_scale='db')
+    # z_fit_model.plot(cs, ax=axz, y_scale='db', linestyle='--')
+    # vecfit.plot_freq_resp(cs, z_fit-z_fit_model.model(cs), y_scale='db')
+    # plt.show()
+
     # Use manual algorithm to fit S
     # f_out2 = vecfit.fit_s(s_data, cs, n_pole=6, n_iter=20, s_inf=1)
     f_out2 = vecfit.fit_s_v2(s_data, cs, n_pole=6, n_iter=20, s_inf=1)
