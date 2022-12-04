@@ -316,6 +316,13 @@ def transmission_line_model():
     # f_out = vecfit.bound_tightening(s_data, cs)
     f_out, log = vecfit.bound_tightening_sweep(s_data, cs, np.inf)
 
+    # try to draw a model for the transmission line model
+    z_fit = (1 + f_out.model(cs)) / (1 - f_out.model(cs)) * z0
+    z_fit_model = vecfit.fit_z(z_fit, cs, n_pole=7, n_iter=20, has_const=False, has_linear=False)
+    axz = vecfit.plot_freq_resp(cs, z_fit, y_scale='db')
+    z_fit_model.plot(cs, ax=axz, y_scale='db', linestyle='--')
+    vecfit.plot_freq_resp(cs, z_fit-z_fit_model.model(cs), y_scale='db')
+
     bound, bw = f_out.bound(np.inf, f0=2.4e9)
     bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
     # ant_integral = f_out.bound_integral(cs, reflect=np.inf)
@@ -361,7 +368,7 @@ def transmission_line_model_vs_freq_range():
         # Try to fit S
         # f_out = vecfit.fit_s(s_data, cs, n_pole=19, n_iter=20, s_inf=-1)
         # f_out = vecfit.bound_tightening(s_data, cs)
-        f_out, log = vecfit.bound_tightening_sweep(s_data, cs, np.inf, -1)
+        f_out, log = vecfit.bound_tightening_sweep(s_data, cs, np.inf)
 
         bound, bw = f_out.bound(np.inf, f0=2.4e9)
         bound_error = f_out.bound_error(s_data, cs, reflect=np.inf)
