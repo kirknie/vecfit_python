@@ -410,6 +410,251 @@ def transmission_line_model_vs_freq_range():
     ax2.legend([r'$B+\delta B$', r'$B$', r'$\delta B$'])
 
 
+def model_brune_synthesis():
+    from vecfit.rational_fct import RationalFct
+    pole = [-3.73390786, -1.28424571-8.71367424j, -1.28424571+8.71367424j,
+            -0.436489866-14.8638563j, -0.436489866+14.8638563j,
+            -0.0829360526-21.3625685j, -0.0829360526+21.3625685j]
+    residue = [186.067925, 93.0835654+26.4856515j, 93.0835654-26.4856515j,
+               88.9730245+8.27914755j, 88.9730245-8.27914755j,
+               132.304907+5.31930782j, 132.304907-5.31930782j]
+    z_model = RationalFct(pole, residue)
+
+    # Brune synthesis
+    import sympy
+    # 1. remove zero at infinity
+    s = sympy.symbols('s')
+    z = 0
+    for p, r in zip(pole, residue):
+        z += r / (s - p)
+    # print(z)
+    # print(sympy.simplify(z))
+    z_pz = sympy.simplify(z)
+    n, d = sympy.fraction(z_pz)
+    # print(n)
+    # print(d)
+    n = 814.7909188*s**6 + 5883.08552836939*s**5 + 455058.612437942*s**4 + 2735360.9352182*s**3 + 63655976.6704326*s**2 + 254736247.151332*s + 1779434631.82901
+    d = 1.0*s**7 + 7.3412511172*s**6 + 771.350936978897*s**5 + 5086.02945258848*s**4 + 163024.909675002*s**3 + 870212.844549592*s**2 + 8922478.53021907*s + 29231404.4495841
+    # shunt C0 for (1/814.7909188) e-9 F
+    C0 = 1/814.7909188
+    d1 = sympy.simplify(d - C0 * s * n)
+    # print(d1)
+    z1 = n / d1
+
+    # 2. find the frequency where real part of z1 is minimum
+    all_freq = np.linspace(0, 40, 10000)
+    all_freq = np.linspace(27.430, 27.435, 10000)
+    z1_f = sympy.lambdify(s, z1, "numpy")
+    z1_num = z1_f(1j*all_freq)
+    idx = np.argmin(z1_num.real)
+    w1 = all_freq[idx]
+    r1 = z1_num.real[idx]
+    x1 = z1_num.imag[idx]
+    # plt.plot(all_freq, z1_num.real)
+    # plt.grid(True)
+    # minimum between 27.430 and 27.435
+    # print(w1, r1, x1)
+    z2 = z1 - r1
+    # x1 > 0, case B
+    y2 = sympy.simplify(1/z2)
+    y2_f = sympy.lambdify(s, y2, "numpy")
+    y2_num = y2_f(1j*w1).imag
+    # print(y2_num, y2_num/w1)
+    # take out shunt negative capacitance C1 y2_num / w1 = -0.00046727390293072437 e-9
+    # also take out the zero at w1 = 27.43233223322332
+    C1 = y2_num/w1
+    n3, d3 = sympy.fraction(sympy.simplify(y2 - s * C1))
+    # print(n3)
+    # print(d3)
+    n4 = sympy.apart(n3 / (s**2 + w1**2))
+    n4 = 0.380730360161106*s**5 + 2.8695974853059*s**4 + 138.975976252091*s**3 + 847.472351426199*s**2 + 10059.3675296087*s + 38844.0243923608
+    # # do a manual partial fraction for d3 / n3 here...
+    # print(d3)
+    # a1, a2, a3, a4, a5, a6 = sympy.symbols('a1 a2 a3 a4 a5 a6')
+    # print(sympy.expand(n4 * s * a1 + (a2 * s**4 + a3 * s**3 + a4 * s**2 + a5 * s + a6) * (s**2 + w1**2)))
+    # tmp_expr = sympy.collect(sympy.expand(n4 * s * a1 + (a2 * s**4 + a3 * s**3 + a4 * s**2 + a5 * s + a6) * (s**2 + w1**2) - d3), s)
+    # print(tmp_expr)
+    # print(tmp_expr.coeff(s, 6))
+    # solve AA * xx = bb
+    bb = [814.790549553869, 5882.43538336516, 455053.331652566, 2735101.61650645, 63654273.6064438, 254715664.721133, 1779345346.7171]
+    AA = [[0.380730360161106, 1, 0, 0, 0, 0],
+          [2.8695974853059, 0, 1, 0, 0, 0],
+          [138.975976252091, 752.532851753943, 0, 1, 0, 0],
+          [847.472351426199, 0, 752.532851753943, 0, 1, 0],
+          [10059.3675296087, 0, 0, 752.532851753943, 0, 1],
+          [38844.0243923608, 0, 0, 0, 752.532851753943, 0],
+          [0, 0, 0, 0, 0, 752.532851753943]]
+    xx, *other = np.linalg.lstsq(AA, bb)
+    # a1 = xx[0] for the shunt LC circuit
+    C3 = 1/xx[0]
+    L3 = xx[0]/(w1**2)
+    d4 = xx[1] * s ** 4 + xx[2] * s ** 3 + xx[3] * s ** 2 + xx[4] * s + xx[5]
+    # print(d4)
+    z4 = d4 / n4
+    # shunt C4 for (0.380730360161106/247.97122460336) e-9 F
+    C4 = (0.380730360161106/247.97122460336)
+    d5 = sympy.simplify(n4 - C4 * s * d4)
+    d5 = 0.397220177872962*s**4 + 44.4827847829576*s**3 + 445.769056411886*s**2 + 6428.99655736558*s + 38844.0243923608
+    # print(d5)
+    z5 = d4 / d5
+
+    # 3. rinse and repeat
+    all_freq = np.linspace(0, 40, 10000)
+    all_freq = np.linspace(17.164, 17.165, 10000)
+    z5_f = sympy.lambdify(s, z5, "numpy")
+    z5_num = z5_f(1j * all_freq)
+    idx = np.argmin(z1_num.real)
+    w5 = all_freq[idx]
+    r5 = z5_num.real[idx]
+    x5 = z5_num.imag[idx]
+    # plt.plot(all_freq, z5_num.real)
+    # plt.grid(True)
+    # minimum between 17.162 and 17.168
+    # print(w5, r5, x5)
+    z6 = z5 - r5
+    # x5 > 0, case B
+    y6 = sympy.simplify(1/z6)
+    y6_f = sympy.lambdify(s, y6, "numpy")
+    y6_num = y6_f(1j*w5).imag
+    # print(y6_num, y6_num/w5)
+    # take out shunt negative capacitance C6 y6_num / w5 = -0.0010925270115166507 e-9
+    # also take out the zero at w5 = 17.164466446644663
+    C6 = y6_num/w5
+    n6, d6 = sympy.fraction(sympy.simplify(y6 - s * C6))
+    # print(n6)
+    # print(d6)
+    n7 = sympy.apart(n6 / (s ** 2 + w5 ** 2))
+    n7 = 0.271219247759287*s**3 + 1.9214235718342*s**2 + 29.9262721326149*s + 131.844981042045
+    # # do a manual partial fraction for d6 / n6 here...
+    # print(d6)
+    # a1, a2, a3, a4 = sympy.symbols('a1 a2 a3 a4')
+    # print(sympy.expand(n7 * s * a1 + (a2 * s**2 + a3 * s**1 + a4) * (s**2 + w5**2)))
+    # tmp_expr = sympy.collect(sympy.expand(n7 * s * a1 + (a2 * s**2 + a3 * s**1 + a4) * (s**2 + w5**2) - d6), s)
+    # print(tmp_expr)
+    # print(tmp_expr.coeff(s, 4))
+    # solve AA * xx = bb
+    bb = [245.933760498865, 1382.10350312125, 59257.3118804709, 228654.6870933, 2165232.39530017]
+    AA = [[0.271219247759287, 1, 0, 0],
+          [1.9214235718342, 0, 1, 0],
+          [29.9262721326149, 294.61890839799, 0, 1],
+          [131.844981042045, 0, 294.61890839799, 0],
+          [0, 0, 0, 294.61890839799]]
+    xx, *other = np.linalg.lstsq(AA, bb)
+    # a1 = xx[0] for the shunt LC circuit
+    C6 = 1/xx[0]
+    L6 = xx[0]/(w5**2)
+    d7 = xx[1] * s ** 2 + xx[2] * s + xx[3]
+    # print(d7)
+    z7 = d7 / n7
+    # shunt C7 for (0.271219247759287/134.423988547205) e-9 F
+    C7 = (0.271219247759287/134.423988547205)
+    d8 = sympy.simplify(n7 - C7 * s * d7)
+    d8 = 0.726760181741815*s**2 + 15.0980996256113*s + 131.844981042045
+    # print(d8)
+    z8 = d7 / d8
+
+    # 4. repeat again
+    all_freq = np.linspace(0, 40, 10000)
+    all_freq = np.linspace(9.21, 9.215, 10000)
+    z8_f = sympy.lambdify(s, z8, "numpy")
+    z8_num = z8_f(1j * all_freq)
+    idx = np.argmin(z8_num.real)
+    w8 = all_freq[idx]
+    r8 = z8_num.real[idx]
+    x8 = z8_num.imag[idx]
+    plt.plot(all_freq, z8_num.real)
+    plt.grid(True)
+    # minimum between 9.21 and 9.215
+    # print(w8, r8, x8)
+    z9 = z8 - r8
+    # x8 > 0, case B
+    y9 = sympy.simplify(1/z9)
+    y9_f = sympy.lambdify(s, y9, "numpy")
+    y9_num = y9_f(1j*w8).imag
+    # print(y9_num, y9_num/w8)
+    # take out shunt negative capacitance C9 y9_num / w8 = -0.0027802422089461027 e-9
+    # also take out the zero at w8 = 9.213003300330033
+    C9 = y9_num/w8
+    n9, d9 = sympy.fraction(sympy.simplify(y9 - s * C9))
+    # print(n6)
+    # print(d6)
+    n10 = sympy.apart(n9 / (s ** 2 + w8 ** 2))
+    n10 = 0.33427684995401*s + 1.5533207672841
+    # # do a manual partial fraction for d9 / n9 here...
+    # print(d9)
+    # a1, a2 = sympy.symbols('a1 a2')
+    # print(sympy.expand(n10 * s * a1 + a2 * (s**2 + w8**2)))
+    # tmp_expr = sympy.collect(sympy.expand(n10 * s * a1 + a2 * (s**2 + w8**2) - d9), s)
+    # print(tmp_expr)
+    # print(tmp_expr.coeff(s, 2))
+    # solve AA * xx = bb
+    bb = [120.232995844173, 297.298049386714, 4774.81017843864]
+    AA = [[0.33427684995401, 1],
+          [1.5533207672841, 0],
+          [0, 84.8794298118921]]
+    xx, *other = np.linalg.lstsq(AA, bb)
+    # a1 = xx[0] for the shunt LC circuit
+    C9 = 1/xx[0]
+    L9 = xx[0]/(w8**2)
+    d10 = xx[1]
+    # print(d10)
+    z10 = d10 / n10
+    # shunt C10 for (0.33427684995401/56.2540322078259) e-9 F
+    C10 = (0.33427684995401/56.2540322078259)
+    d11 = sympy.simplify(n10 - C10 * s * d10)
+    d11 = 1.5533207672841
+    # print(d11)
+    z11 = d10 / d11
+    # z11 = 36.215335166208526
+    # done
+
+    # summarize:
+    CC0 = (1/814.7909188) * 1e-9
+    RR1 = r1
+    CC1 = y2_num/w1 * 1e-9
+    CC2 = C3 * 1e-9
+    LL2 = L3 * 1e-9
+    CC3 = (0.380730360161106/247.97122460336) * 1e-9
+    RR4 = r5
+    CC4 = y6_num/w5 * 1e-9
+    CC5 = C6 * 1e-9
+    LL5 = L6 * 1e-9
+    CC6 = (0.271219247759287/134.423988547205) * 1e-9
+    RR7 = r8
+    CC7 = y9_num/w8 * 1e-9
+    CC8 = C9 * 1e-9
+    LL8 = L9 * 1e-9
+    CC9 = (0.33427684995401/56.2540322078259) * 1e-9
+    RR = 36.215335166208526
+
+    # transform to coupled inductance form
+    LLL1 = CC3 / (CC1 + CC3) * LL2
+    LLL2 = CC2 / (CC1 + CC3) * LL2
+    LLL3 = CC1 / (CC1 + CC3) * LL2
+    CCC2 = (CC1 + CC3)
+    MMM2 = LLL2
+    LLL1 = LLL1 + LLL2
+    LLL3 = LLL3 + LLL2
+
+    LLL4 = CC6 / (CC4 + CC6) * LL5
+    LLL5 = CC5 / (CC4 + CC6) * LL5
+    LLL6 = CC4 / (CC4 + CC6) * LL5
+    CCC5 = (CC4 + CC6)
+    MMM5 = LLL5
+    LLL4 = LLL4 + LLL5
+    LLL6 = LLL6 + LLL5
+
+    LLL7 = CC9 / (CC7 + CC9) * LL8
+    LLL8 = CC8 / (CC7 + CC9) * LL8
+    LLL9 = CC7 / (CC7 + CC9) * LL8
+    CCC8 = (CC7 + CC9)
+    MMM8 = LLL8
+    LLL7 = LLL7 + LLL8
+    LLL9 = LLL9 + LLL8
+
+    return
+
+
 def dipole():
     s1p_file = './resource/single_dipole.s1p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(s1p_file)
