@@ -401,6 +401,29 @@ def transmission_line_model_vs_freq_range():
         legend_text += ['Model {} ({} poles)'.format(i+1, pole_num), 'Model {} error'.format(i+1)]
     ax1.legend(legend_text)
 
+    # extended frequency response
+    fig = plt.figure(figsize=(8, 5.5))
+    ax1 = fig.add_subplot(111)
+    vecfit.plot_freq_resp(cs, s_data, ax=ax1, y_scale='db', color=colors(0))
+    i = 1
+    for f_out, f2 in zip(f_out_list, f2_list):
+        f_band = copy.copy(freq)
+        f_band[freq > f2] = np.nan
+        cs = f_band*2j*np.pi
+        vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', color=colors(i))
+        i += 1
+    legend_text = ['S-param data']
+    for i, pole_num in enumerate(pole_num_list):
+        legend_text += ['Error for Model {} ({} poles)'.format(i+1, pole_num)]
+    ax1.legend(legend_text)
+    i = 1
+    for f_out, f2 in zip(f_out_list, f2_list):
+        f_band = copy.copy(freq)
+        f_band[freq < f2] = np.nan
+        cs = f_band*2j*np.pi
+        vecfit.plot_freq_resp(cs, s_data-f_out.model(cs), ax=ax1, y_scale='db', linestyle='--', color=colors(i))
+        i += 1
+
     # pole vs bound
     fig = plt.figure(figsize=(8, 5.5))
     ax2 = fig.add_subplot(111)
@@ -804,18 +827,24 @@ def long_dipole_paper():
     ax = vecfit.plot_freq_resp(cs, s_data, y_scale='db')
     vecfit.plot_freq_resp(cs, s_tmp, ax=ax, y_scale='db', linestyle='--')
     f_out.plot(cs, ax=ax, y_scale='db', linestyle='--')
-    f_out2.plot(cs, ax=ax, y_scale='db', linestyle='--')
+    # f_out2.plot(cs, ax=ax, y_scale='db', linestyle='--')
     ax.set_ylabel(r'Reflection coefficient $\Gamma$ (dB)')
-    ax.legend(['Simulation', 'Paper [16?]', 'Algorithm 2', 'Impedance Method'])
+    ax.legend(['Simulation', 'Paper [18?]', 'Algorithm 2'])
+    # ax.legend(['Simulation', 'Paper [18?]', 'Algorithm 2', 'Impedance Method'])
     ax.grid(True, which='both', linestyle='--')
+
+    # calculate integrated error
+    err_tmp = vecfit.num_integral(cs.imag, np.abs(s_tmp - s_data))
+    err_f_out = vecfit.num_integral(cs.imag, np.abs(f_out.model(cs) - s_data))
+    err_f_out2 = vecfit.num_integral(cs.imag, np.abs(f_out2.model(cs) - s_data))
 
     # bound values
     print('Paper:')
-    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(s_model.pole), paper_bound, paper_bound_error, paper_bound + paper_bound_error))
+    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}, integrated error {:.5e}'.format(len(s_model.pole), paper_bound, paper_bound_error, paper_bound + paper_bound_error, err_tmp))
     print('Algorithm:')
-    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(f_out.pole), bound, bound_error, bound + bound_error))
+    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}, integrated error {:.5e}'.format(len(f_out.pole), bound, bound_error, bound + bound_error, err_f_out))
     print('Manual comparison:')
-    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}'.format(len(f_out2.pole), bound2, bound_error2, bound2 + bound_error2))
+    print('Poles {}, bound {:.5e}, error {:.5e}, sum {:.5e}, integrated error {:.5e}'.format(len(f_out2.pole), bound2, bound_error2, bound2 + bound_error2, err_f_out2))
 
 
 def dipole_bound_vs_pole():
@@ -1280,13 +1309,13 @@ if __name__ == '__main__':
     # coupled_siw_even_odd()
     # coupled_siw()
     # transmission_line_model()
-    # transmission_line_model_vs_freq_range()
+    transmission_line_model_vs_freq_range()
     # dipole()
     # dipole_paper()
     # dipole_bound_vs_pole()
     # long_dipole_paper()
     # long_dipole_bound_vs_pole()
-    coupled_dipole()
+    # coupled_dipole()
     # skycross_antennas()
     # two_ifa()
     # four_ifa()
