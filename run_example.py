@@ -1270,6 +1270,73 @@ def skycross_antennas_old():
     plt.show()
 
 
+def circuit_four():
+    # build the circuit
+    L0 = 0.1e-9
+    R0 = 1
+    # R11 = 15.85
+    R11 = 45.85
+    L11 = 11.52e-9
+    C11 = 2.25e-12
+    L12 = 1.49e-9
+    C12 = 2.3e-12
+    L13 = 1.77e-9
+    C13 = 0.5e-12
+    L24 = 8.34e-9
+    C24 = 5.65e-12
+    L34 = 0.5e-9
+    C34 = 4.42e-12
+
+    # build Y matrix
+    freq = np.linspace(1e9, 5e9, 1000)
+    cs = freq*2j*np.pi
+    Y11 = 1/R11 + C11*cs + 1/(L11*cs)
+    Y12 = C12*cs + 1/(L12*cs)
+    Y13 = C12*cs + 1/(L12*cs)
+    Y24 = C12*cs + 1/(L12*cs)
+    Y34 = C12*cs + 1/(L12*cs)
+    Y_mx = np.zeros([4, 4, len(freq)], dtype=np.complex128)
+    Y_mx[0, 0, :] = Y11 + Y12 + Y13
+    Y_mx[0, 1, :] = -Y12
+    Y_mx[1, 0, :] = -Y12
+    Y_mx[0, 2, :] = -Y13
+    Y_mx[2, 0, :] = -Y13
+    Y_mx[1, 1, :] = Y11 + Y12 + Y24
+    Y_mx[1, 3, :] = -Y24
+    Y_mx[3, 1, :] = -Y24
+    Y_mx[2, 2, :] = Y11 + Y13 + Y34
+    Y_mx[2, 3, :] = -Y34
+    Y_mx[3, 2, :] = -Y34
+    Y_mx[3, 3, :] = Y11 + Y24 + Y34
+    Z_mx = np.zeros([4, 4, len(freq)], dtype=np.complex128)
+    Z0 = R0 + L0*cs
+    for i in range(len(freq)):
+        Z_mx[:, :, i] = np.linalg.inv(Y_mx[:, :, i])
+    Z_mx[0, 0, :] += Z0
+    Z_mx[1, 1, :] += Z0
+    Z_mx[2, 2, :] += Z0
+    Z_mx[3, 3, :] += Z0
+    S_mx = np.zeros([4, 4, len(freq)], dtype=np.complex128)
+    z0 = 50
+    n = 4
+    for i in range(len(freq)):
+        S_mx[:, :, i] = np.matrix(Z_mx[:, :, i] / z0 - np.identity(n)) * np.linalg.inv(np.matrix(Z_mx[:, :, i] / z0 + np.identity(n)))
+    
+    # feed S matrix into algorithm
+    s_matrix, bound = vecfit.mode_fitting(S_mx, cs, True)
+    bound_error = s_matrix.bound_error(S_mx, cs, reflect=np.inf)
+    ant_integral = vecfit.bound_integral(S_mx, cs, np.inf)
+    print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
+
+    fig = plt.figure(figsize=(8, 5.5))
+    ax1 = fig.add_subplot(111)
+    for i in range(4):
+        vecfit.plot_freq_resp(cs, S_mx[0, i, :], ax=ax1, y_scale='db', color=colors(i))
+    ax1.legend(['$S_{11}$', '$S_{12}$', '$S_{13}$', '$S_{14}$'])
+    for i in range(4):
+        vecfit.plot_freq_resp(cs, s_matrix.model(cs)[0, i, :], ax=ax1, y_scale='db', linestyle='--', color=colors(i))
+
+
 def two_ifa():
     snp_file = './resource/Orthogonal_IFA_Free_Space.s2p'
     freq, n, z_data, s_data, z0_data = vecfit.read_snp(snp_file)
@@ -1298,8 +1365,27 @@ def four_ifa():
     print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
 
     # plot the s_matrix
-    axs = vecfit.plot_freq_resp_matrix(cs, s_data, y_scale='db')
-    s_matrix.plot(cs, axs=axs, y_scale='db', linestyle='--')
+    # axs = vecfit.plot_freq_resp_matrix(cs, s_data, y_scale='db')
+    # s_matrix.plot(cs, axs=axs, y_scale='db', linestyle='--')
+    fig = plt.figure(figsize=(8, 5.5))
+    # ax1 = fig.add_subplot(211)
+    # for i in range(4):
+    #     vecfit.plot_freq_resp(cs, s_data[i, i, :], ax=ax1, y_scale='db', color=colors(i))
+    #     vecfit.plot_freq_resp(cs, s_matrix.model(cs)[i, i, :], ax=ax1, y_scale='db', linestyle='--', color=colors(i))
+    # ax1 = fig.add_subplot(212)
+    # idx = 0
+    # for i in range(4):
+    #     for j in range(1, i):
+    #         vecfit.plot_freq_resp(cs, s_data[i, j, :], ax=ax1, y_scale='db', color=colors(idx))
+    #         vecfit.plot_freq_resp(cs, s_matrix.model(cs)[i, j, :], ax=ax1, y_scale='db', linestyle='--', color=colors(idx))
+    #         idx += 1
+    
+    ax1 = fig.add_subplot(111)
+    for i in range(4):
+        vecfit.plot_freq_resp(cs, s_data[0, i, :], ax=ax1, y_scale='db', color=colors(i))
+    ax1.legend(['$S_{11}$', '$S_{12}$', '$S_{13}$', '$S_{14}$'])
+    for i in range(4):
+        vecfit.plot_freq_resp(cs, s_matrix.model(cs)[0, i, :], ax=ax1, y_scale='db', linestyle='--', color=colors(i))
 
 
 if __name__ == '__main__':
@@ -1309,7 +1395,7 @@ if __name__ == '__main__':
     # coupled_siw_even_odd()
     # coupled_siw()
     # transmission_line_model()
-    transmission_line_model_vs_freq_range()
+    # transmission_line_model_vs_freq_range()
     # dipole()
     # dipole_paper()
     # dipole_bound_vs_pole()
@@ -1317,6 +1403,7 @@ if __name__ == '__main__':
     # long_dipole_bound_vs_pole()
     # coupled_dipole()
     # skycross_antennas()
+    circuit_four()
     # two_ifa()
     # four_ifa()
 
