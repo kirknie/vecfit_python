@@ -1292,9 +1292,9 @@ def circuit_four():
     cs = freq*2j*np.pi
     Y11 = 1/R11 + C11*cs + 1/(L11*cs)
     Y12 = C12*cs + 1/(L12*cs)
-    Y13 = C12*cs + 1/(L12*cs)
-    Y24 = C12*cs + 1/(L12*cs)
-    Y34 = C12*cs + 1/(L12*cs)
+    Y13 = C13*cs + 1/(L13*cs)
+    Y24 = C24*cs + 1/(L24*cs)
+    Y34 = C34*cs + 1/(L34*cs)
     Y_mx = np.zeros([4, 4, len(freq)], dtype=np.complex128)
     Y_mx[0, 0, :] = Y11 + Y12 + Y13
     Y_mx[0, 1, :] = -Y12
@@ -1329,12 +1329,28 @@ def circuit_four():
     print('Bound is {:.5e}, Bound error is {:.5e}, The integral of the antenna is {:.5e}'.format(bound, bound_error, ant_integral))
 
     fig = plt.figure(figsize=(8, 5.5))
-    ax1 = fig.add_subplot(111)
+    ax1 = fig.add_subplot(211)
     for i in range(4):
-        vecfit.plot_freq_resp(cs, S_mx[0, i, :], ax=ax1, y_scale='db', color=colors(i))
-    ax1.legend(['$S_{11}$', '$S_{12}$', '$S_{13}$', '$S_{14}$'])
+        vecfit.plot_freq_resp(cs, S_mx[i, i, :], ax=ax1, y_scale='db', color=colors(i))
+    ax1.legend(['$S_{11}$', '$S_{22}$', '$S_{33}$', '$S_{44}$'])
     for i in range(4):
-        vecfit.plot_freq_resp(cs, s_matrix.model(cs)[0, i, :], ax=ax1, y_scale='db', linestyle='--', color=colors(i))
+        vecfit.plot_freq_resp(cs, s_matrix.model(cs)[i, i, :], ax=ax1, y_scale='db', linestyle='--', color=colors(i))
+    ax1.set_xlabel('')
+    ax2 = fig.add_subplot(212)
+    idx = 0
+    tag = []
+    for i in range(4):
+        for j in range(i+1, 4):
+            vecfit.plot_freq_resp(cs, S_mx[i, j, :], ax=ax2, y_scale='db', color=colors(idx))
+            tag.append('$S_{' + str(i+1) + str(j+1) +'}$')
+            idx += 1
+    ax2.legend(tag)
+    idx = 0
+    for i in range(4):
+        for j in range(i+1, 4):
+            vecfit.plot_freq_resp(cs, s_matrix.model(cs)[i, j, :], ax=ax2, y_scale='db', linestyle='--', color=colors(idx))
+            idx += 1
+    plt.subplots_adjust(wspace=0, hspace=0)
 
 
 def two_ifa():

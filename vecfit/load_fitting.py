@@ -9,7 +9,7 @@ import numpy as np
 import copy
 from .vector_fitting import vector_fitting_rescale
 from .matrix_fitting import joint_svd
-from .rational_fct import RationalMtx
+from .rational_fct import RationalMtx, plot_freq_resp
 
 
 def fit_z(f, s, n_pole=10, n_iter=10, has_const=True, has_linear=True, fixed_pole=None, reflect_z=None):
@@ -215,7 +215,7 @@ def bound_tightening_sweep(f, s, s0=None, fs0=None, fit_wt=None):
     wt_zero = []
     pole_num_zero = []
 
-    for n_pole in range(1, n_pole_max+1):
+    for n_pole in range(3, n_pole_max+1):
         for s_dc, s_inf in reflect_list:
             # initial wt is 0
             wt = 0.0
@@ -354,6 +354,9 @@ def mode_fitting(f, s, bound_output=False):
         sigma_n = Sigma[i, i, :-1]
         # sigma_model = bound_tightening(sigma_n, s, np.inf)
         sigma_model, log = bound_tightening_sweep(sigma_n, s, np.inf, fit_wt=fit_wt)
+        # plot the sigma_model
+        ax = plot_freq_resp(s, sigma_n, y_scale='db')
+        sigma_model.plot(s, ax=ax, y_scale='db', linestyle='--')
         all_model.append(copy.copy(sigma_model))
 
         # re-build the matrix model
